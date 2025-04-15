@@ -1,0 +1,40 @@
+{
+	"name": "united-states-school-districts",
+	"version": "1.0.21",
+	"description": "A lightweight in-memory lookup service for United States school districts. It loads government-verified shapefile data for efficient geospatial queries.",
+	"main": "dist/server.js",
+	"esModuleInterop": true,
+	"scripts": {
+		"start": "node dist/server.js",
+		"dev": "nodemon --watch src --ext ts,tsx --exec ts-node src/server.ts",
+		"build": "tsc",
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"nodemonConfig": {
+		"watch": [
+			"src"
+		],
+		"ext": "ts,tsx",
+		"ignore": [
+			"dist/**/*"
+		]
+	},
+	"license": "ISC",
+	"dependencies": {
+		"express": "^5.1.0",
+		"node-fetch": "2.7.0",
+		"shapefile": "^0.6.6",
+		"unzipper": "^0.12.3",
+		"@turf/turf": "^7.2.0"
+	},
+	"devDependencies": {
+		"@types/express": "^5.0.1",
+		"@types/node": "^20.4.0",
+		"@types/node-fetch": "^2.6.12",
+		"@types/shapefile": "^0.6.4",
+		"@types/unzipper": "^0.10.11",
+		"ts-node": "^10.9.1",
+		"typescript": "^5.2.2",
+		"nodemon": "^3.1.7"
+	}
+}

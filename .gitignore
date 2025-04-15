@@ -1,0 +1,10 @@
+/node_modules
+minify.js
+minified.txt
+.local.env
+.production.env
+.env
+/test_emails
+us-public-schools.geojson
+school_district_data/EDGE_SCHOOLDISTRICT_TL24_SY2324.dbf
+school_district_data/EDGE_SCHOOLDISTRICT_TL24_SY2324.shp
