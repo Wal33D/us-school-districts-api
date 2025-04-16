@@ -16,7 +16,7 @@ const PORT: number = 3712;
 
 const app = express();
 app.use(express.json());
-app.use(localOnlyMiddleware);
+//app.use(localOnlyMiddleware);
 
 /**
  * GET /school-district route handler.
