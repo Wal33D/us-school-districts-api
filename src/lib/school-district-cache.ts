@@ -24,25 +24,34 @@ export let districtsCache: SchoolDistrict[] | null = null;
 /**
  * Transforms a shapefile feature into a SchoolDistrict record.
  * Assumes that the data has been verified (i.e., GEOID and NAME exist).
- * @param feature - The shapefile feature.
- * @returns A SchoolDistrict record or null if required properties are missing.
+ *
+ * @param feature - The shapefile feature destructured into properties and geometry.
+ * @returns An object with a status property and, on success, the district record.
  */
-function transformDistrict(feature: Feature<Polygon | MultiPolygon, any>): SchoolDistrict | null {
-    if (!feature.properties || !feature.properties.GEOID || !feature.properties.NAME) {
-        return null;
+const transformDistrict = (
+    { properties, geometry }: Feature<Polygon | MultiPolygon, any>
+): { status: string; district?: SchoolDistrict; error?: string } => {
+    // Return object variables are implicit here since this function is small.
+    if (!properties || !properties.GEOID || !properties.NAME) {
+        return { status: "failure", error: "Missing required properties" };
     }
-    return {
-        districtId: feature.properties.GEOID,
-        name: feature.properties.NAME,
-        geometry: feature.geometry
+    const district: SchoolDistrict = {
+        districtId: properties.GEOID,
+        name: properties.NAME,
+        geometry: geometry
     };
-}
+    return { status: "success", district };
+};
 
 /**
  * Loads all school district data into memory by reading the shapefile.
  * Logs the number of records loaded and the current memory usage.
+ *
+ * @returns An object with a status property, and on success, a message detailing the outcome.
  */
-export async function loadDistrictsIntoCache(): Promise<void> {
+export const loadDistrictsIntoCache = async (): Promise<{ status: string; message?: string; error?: any }> => {
+    // Declare the return object at the very start.
+    let returnObj: { status: string; message?: string; error?: any } = { status: "failure" };
     try {
         await ensureLatestData();
         const { filePrefix } = getFileInfo();
@@ -53,24 +62,28 @@ export async function loadDistrictsIntoCache(): Promise<void> {
         let result = await source.read();
         while (!result.done) {
             const feature = result.value as Feature<Polygon | MultiPolygon, any>;
-            if (feature.geometry && (feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon")) {
-                const district = transformDistrict(feature);
-                if (district) {
-                    districts.push(district);
+            if (
+                feature.geometry &&
+                (feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon")
+            ) {
+                const transformation = transformDistrict(feature);
+                if (transformation.status === "success" && transformation.district) {
+                    districts.push(transformation.district);
                 }
             }
             result = await source.read();
         }
         districtsCache = districts;
         console.info(`[CACHE] Loaded ${districts.length} school district records into memory.`);
-
-        // Log memory usage after loading.
         const memoryUsage = process.memoryUsage();
         console.info(
             `Memory Usage: Heap Used ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB, Heap Total ${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB`
         );
+        returnObj = { status: "success", message: `Loaded ${districts.length} records into cache` };
     } catch (err) {
         console.error("[CACHE] Error loading districts into cache:", err);
-        throw err;
+        // A sprinkle of humor for those tough cache days.
+        returnObj = { status: "error", error: "Don't panic, it's just caching! " + err };
     }
-}
+    return returnObj;
+};

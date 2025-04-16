@@ -8,6 +8,6 @@ export interface SchoolDistrict {
 
 export interface SchoolDistrictLookupResult {
     status: boolean;
-    districtId?: string;
-    districtName?: string;
+    districtId: string | null;
+    districtName: string | null;
 }

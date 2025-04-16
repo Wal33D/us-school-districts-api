@@ -2,7 +2,7 @@
  * src/server.ts
  *
  * This module creates an Express server that provides a school district lookup
- * endpoint. It loads district data into memory at startup, applies middleware to 
+ * endpoint. It loads district data into memory at startup, applies middleware to
  * allow only local requests, and listens on a fixed port (3712).
  */
 
@@ -10,50 +10,53 @@ import express, { Request } from 'express';
 import { localOnlyMiddleware } from './middleware/localOnlyMiddleware';
 import { lookupSchoolDistrict } from './functions/lookupSchoolDistrict';
 import { loadDistrictsIntoCache } from './lib/school-district-cache';
+import type { SchoolDistrictLookupResult } from './types';
 
-// Use a fixed port.
 const PORT: number = 3712;
-
 const app = express();
+
 app.use(express.json());
 app.use(localOnlyMiddleware);
 
 /**
  * GET /school-district route handler.
  * Returns a lookup result for the provided latitude and longitude.
- * Follows guidelines with a single return statement.
+ * Always returns {status, districtId, districtName}.
  */
 app.get('/school-district', (req: Request, res: any) => {
-	let responsePayload: any = {};
+	// Default the response to { status: false, districtId: null, districtName: null }
+	let responsePayload: SchoolDistrictLookupResult = {
+		status: false,
+		districtId: null,
+		districtName: null
+	};
 
 	try {
-		// Destructure and validate query parameters.
+		// Validate that lat and lng are provided
 		const { lat, lng } = req.query;
 		if (!lat || !lng) {
-			responsePayload = { status: false, error: 'Missing required query parameters: lat and lng' };
+			// We do not populate an "error" field; we keep the shape minimal
+			// e.g., { status: false, districtId: null, districtName: null }
 		} else {
-			const latNum: number = Number(lat);
-			const lngNum: number = Number(lng);
-			if (isNaN(latNum) || isNaN(lngNum)) {
-				responsePayload = { status: false, error: 'Invalid query parameter values: lat and lng must be numbers' };
-			} else {
+			const latNum = Number(lat);
+			const lngNum = Number(lng);
+
+			if (!isNaN(latNum) && !isNaN(lngNum)) {
+				// Use lookup function
 				const lookupResult = lookupSchoolDistrict({ lat: latNum, lng: lngNum });
-				if (!lookupResult.status) {
-					responsePayload = { status: false, error: 'No school district found for the provided location' };
-				} else {
-					responsePayload = lookupResult;
-				}
+				// Overwrite responsePayload with the shape from lookupResult
+				responsePayload = lookupResult;
 			}
 		}
-	} catch (error: any) {
+	} catch (error) {
 		console.error('Error in /school-district route:', error);
-		responsePayload = { status: false, error: error.message || 'Internal Server Error' };
+		// Any error still yields the same shape with status=false
 	}
 
 	return res.json(responsePayload);
 });
 
-// Load district data into memory and then start the server.
+// Load district data into memory and then start the server
 loadDistrictsIntoCache()
 	.then(() => {
 		app.listen(PORT, () => {
@@ -65,7 +68,7 @@ loadDistrictsIntoCache()
 		process.exit(1);
 	});
 
-// Graceful shutdown handlers.
+// Graceful shutdown
 process.on('SIGINT', () => {
 	console.info('\n[SHUTDOWN] Caught SIGINT. Exiting...');
 	process.exit(0);

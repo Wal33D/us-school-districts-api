@@ -16,11 +16,24 @@ import type { SchoolDistrictLookupResult } from '../types';
  * @param param0 - An object with latitude and longitude values.
  * @returns A SchoolDistrictLookupResult indicating whether a match was found.
  */
-export const lookupSchoolDistrict = ({ lat, lng }: { lat: number; lng: number }): SchoolDistrictLookupResult => {
-    let result: SchoolDistrictLookupResult = { status: false };
+export const lookupSchoolDistrict = ({
+    lat,
+    lng
+}: {
+    lat: number;
+    lng: number;
+}): SchoolDistrictLookupResult => {
+    // Always initialize the return object with the required shape:
+    let result: SchoolDistrictLookupResult = {
+        status: false,
+        districtId: null,
+        districtName: null
+    };
 
     if (!districtsCache) {
-        console.error("District cache is empty. Ensure that loadDistrictsIntoCache() has been called on startup.");
+        console.error(
+            "District cache is empty. Ensure that loadDistrictsIntoCache() has been called on startup."
+        );
     } else {
         const pt = point([lng, lat]); // [longitude, latitude]
         for (const district of districtsCache) {
@@ -34,5 +47,6 @@ export const lookupSchoolDistrict = ({ lat, lng }: { lat: number; lng: number })
             }
         }
     }
+
     return result;
 };
