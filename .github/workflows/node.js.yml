@@ -29,6 +29,7 @@ jobs:
                   name: build-files
                   path: |
                       dist
+                      ecosystem.config.js
                       package.json
                       package-lock.json
 
@@ -45,50 +46,50 @@ jobs:
             - name: List downloaded artifact
               run: ls -la build-files
 
-            - name: Ensure target directory exists on server
+            - name: Ensure target directory exists on Linode
               uses: appleboy/ssh-action@master
               with:
-                  host: ${{ secrets.DEPLOY_HOST }}
-                  username: ${{ secrets.DEPLOY_USER }}
-                  key: ${{ secrets.DEPLOY_SSH_KEY }}
+                  host: ${{ secrets.LINODE_HOST }}
+                  username: ${{ secrets.LINODE_USER }}
+                  key: ${{ secrets.LINODE_SSH_KEY }}
                   script: |
-                      mkdir -p /home/school-districts-endpoint
+                      mkdir -p /home/united-states-school-districts
 
-            - name: Copy Build Files to Server
+            - name: Copy Build Files to Linode Server
               uses: appleboy/scp-action@master
               with:
-                  host: ${{ secrets.DEPLOY_HOST }}
-                  username: ${{ secrets.DEPLOY_USER }}
-                  key: ${{ secrets.DEPLOY_SSH_KEY }}
+                  host: ${{ secrets.LINODE_HOST }}
+                  username: ${{ secrets.LINODE_USER }}
+                  key: ${{ secrets.LINODE_SSH_KEY }}
                   source: 'build-files/.'
-                  target: '/home/school-districts-endpoint/'
+                  target: '/home/united-states-school-districts/'
                   strip_components: 1
-
-            - name: Install Node Modules on Server
-              uses: appleboy/ssh-action@master
-              with:
-                  host: ${{ secrets.DEPLOY_HOST }}
-                  username: ${{ secrets.DEPLOY_USER }}
-                  key: ${{ secrets.DEPLOY_SSH_KEY }}
-                  script: |
-                      cd /home/school-districts-endpoint
-                      npm ci
-
-            - name: Restart Application with PM2 on Server
-              uses: appleboy/ssh-action@master
-              with:
-                  host: ${{ secrets.DEPLOY_HOST }}
-                  username: ${{ secrets.DEPLOY_USER }}
-                  key: ${{ secrets.DEPLOY_SSH_KEY }}
-                  script: |
-                      cd /home/school-districts-endpoint
-                      pm2 reload all || pm2 start dist/server.js --name united-states-school-districts
-                      pm2 save
 
             - name: List deployment directory contents
               uses: appleboy/ssh-action@master
               with:
-                  host: ${{ secrets.DEPLOY_HOST }}
-                  username: ${{ secrets.DEPLOY_USER }}
-                  key: ${{ secrets.DEPLOY_SSH_KEY }}
-                  script: 'ls -la /home/school-districts-endpoint/'
+                  host: ${{ secrets.LINODE_HOST }}
+                  username: ${{ secrets.LINODE_USER }}
+                  key: ${{ secrets.LINODE_SSH_KEY }}
+                  script: 'ls -la /home/united-states-school-districts/'
+
+            - name: Install Node Modules on Linode
+              uses: appleboy/ssh-action@master
+              with:
+                  host: ${{ secrets.LINODE_HOST }}
+                  username: ${{ secrets.LINODE_USER }}
+                  key: ${{ secrets.LINODE_SSH_KEY }}
+                  script: |
+                      cd /home/united-states-school-districts
+                      npm ci
+
+            - name: Start or Reload and Save PM2 Process on Linode
+              uses: appleboy/ssh-action@master
+              with:
+                  host: ${{ secrets.LINODE_HOST }}
+                  username: ${{ secrets.LINODE_USER }}
+                  key: ${{ secrets.LINODE_SSH_KEY }}
+                  script: |
+                      cd /home/united-states-school-districts
+                      pm2 startOrReload ecosystem.config.js
+                      pm2 save
