@@ -53,6 +53,9 @@ app.get('/school-district', (req: Request, res: any) => {
 		// Any error still yields the same shape with status=false
 	}
 
+	// Log the lookup result to the console before responding
+	console.info('School District Lookup Result:', responsePayload);
+
 	return res.json(responsePayload);
 });
 
