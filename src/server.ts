@@ -15,15 +15,16 @@
  */
 
 import fs from "fs/promises";
-import { createWriteStream, rmSync } from "fs";
 import path from "path";
-import fetch from "node-fetch"; // optional once Node ≥18 LTS ships global fetch
+import fetch from "node-fetch";
+import Rbush from "rbush";
 import unzipper from "unzipper";
 import * as shapefile from "shapefile";
-import express, { Request, Response } from "express";
+import express, { Request } from "express";
 import { localOnlyMiddleware } from "./middleware/localOnlyMiddleware";
+import { createWriteStream, rmSync } from "fs";
 import { point, booleanPointInPolygon, bbox as turfBbox } from "@turf/turf";
-import Rbush from "rbush";
+
 import type { Feature, Polygon, MultiPolygon } from "geojson";
 import type { SchoolDistrict, SchoolDistrictLookupResult } from "./types";
 
@@ -200,7 +201,7 @@ app.get("/school-district", (req: Request, res: any) => {
 	try {
 		const { shpPath, dbfPath } = await ensureLatestData();
 		await buildSpatialIndex(shpPath, dbfPath);
-		app.listen(PORT, () => console.info(`Server listening on :${PORT}`));
+		app.listen(PORT, () => console.info(`[READY] candycomp-us-school-districts-api listening on localhost:${PORT}`));
 	} catch (err) {
 		console.error("[BOOT] Failed to start server:", err);
 		process.exit(1);
