@@ -53,7 +53,7 @@ jobs:
                   username: ${{ secrets.LINODE_USER }}
                   key: ${{ secrets.LINODE_SSH_KEY }}
                   script: |
-                      mkdir -p /home/puppeteer-user/us-school-districts
+                      mkdir -p /home/puppeteer-user/candycomp-us-school-districts-api
 
             - name: Copy Build Files to Linode Server
               uses: appleboy/scp-action@master
@@ -62,7 +62,7 @@ jobs:
                   username: ${{ secrets.LINODE_USER }}
                   key: ${{ secrets.LINODE_SSH_KEY }}
                   source: 'build-files/.'
-                  target: '/home/puppeteer-user/us-school-districts/'
+                  target: '/home/puppeteer-user/candycomp-us-school-districts-api/'
                   strip_components: 1
 
             - name: List deployment directory contents
@@ -71,7 +71,7 @@ jobs:
                   host: ${{ secrets.LINODE_HOST }}
                   username: ${{ secrets.LINODE_USER }}
                   key: ${{ secrets.LINODE_SSH_KEY }}
-                  script: 'ls -la /home/puppeteer-user/us-school-districts/'
+                  script: 'ls -la /home/puppeteer-user/candycomp-us-school-districts-api/'
 
             - name: Install Node Modules on Linode
               uses: appleboy/ssh-action@master
@@ -80,7 +80,7 @@ jobs:
                   username: ${{ secrets.LINODE_USER }}
                   key: ${{ secrets.LINODE_SSH_KEY }}
                   script: |
-                      cd /home/puppeteer-user/us-school-districts
+                      cd /home/puppeteer-user/candycomp-us-school-districts-api
                       npm ci
 
             - name: Start or Reload and Save PM2 Process on Linode
@@ -90,6 +90,6 @@ jobs:
                   username: ${{ secrets.LINODE_USER }}
                   key: ${{ secrets.LINODE_SSH_KEY }}
                   script: |
-                      cd /home/puppeteer-user/us-school-districts
+                      cd /home/puppeteer-user/candycomp-us-school-districts-api
                       pm2 startOrReload ecosystem.config.js
                       pm2 save
