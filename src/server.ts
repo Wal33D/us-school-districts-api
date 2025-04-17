@@ -71,7 +71,6 @@ loadDistrictsIntoCache()
 		process.exit(1);
 	});
 
-// Graceful shutdown
 process.on('SIGINT', () => {
 	console.info('\n[SHUTDOWN] Caught SIGINT. Exiting...');
 	process.exit(0);
