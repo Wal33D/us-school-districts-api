@@ -1,5 +1,5 @@
 {
-	"name": "united-states-school-districts",
+	"name": "candycomp-us-school-districts-api",
 	"version": "1.0.21",
 	"description": "A lightweight in-memory lookup service for United States school districts. It loads government-verified shapefile data for efficient geospatial queries.",
 	"main": "dist/server.js",
