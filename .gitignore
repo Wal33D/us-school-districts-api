@@ -4,5 +4,5 @@ minified.txt
 .local.env
 .production.env
 .env
-school_district_data/EDGE_SCHOOLDISTRICT_TL24_SY2324.dbf
-school_district_data/EDGE_SCHOOLDISTRICT_TL24_SY2324.shp
+/school_district_data
+/dist

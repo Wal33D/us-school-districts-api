@@ -9,6 +9,6 @@
 		"rootDir": "src",
 		"allowJs": true
 	},
-	"include": ["src/**/*"],
+	"include": ["src/**/*", "utils/shapefileHelpers.ts", "types.ts"],
 	"exclude": ["node_modules", "dist"]
 }
