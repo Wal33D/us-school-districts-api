@@ -189,7 +189,7 @@ app.get("/school-district", (req: Request, res: any) => {
 		return res.json({ status: false, districtId: null, districtName: null });
 	}
 	const result = lookupSchoolDistrict(lat, lng);
-	console.log(result)
+	console.log({ input: { lat, lng }, output: result })
 	res.json(result);
 });
 
