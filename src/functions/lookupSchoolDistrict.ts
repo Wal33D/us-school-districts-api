@@ -23,7 +23,6 @@ export const lookupSchoolDistrict = ({
     lat: number;
     lng: number;
 }): SchoolDistrictLookupResult => {
-    // Always initialize the return object with the required shape:
     let result: SchoolDistrictLookupResult = {
         status: false,
         districtId: null,
