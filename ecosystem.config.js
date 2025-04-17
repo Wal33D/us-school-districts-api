@@ -3,9 +3,9 @@
 module.exports = {
 	apps: [
 		{
-			name: 'united-states-school-districts',
+			name: 'candycomp-united-states-school-districts-api',
 			script: 'dist/server.js',
-			exec_mode: 'cluster', // Enables zero-downtime reloads
+			exec_mode: 'cluster',
 			watch: false,
 			env: {
 				NODE_ENV: 'production',
