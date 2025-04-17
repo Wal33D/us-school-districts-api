@@ -37,6 +37,15 @@ const SCHOOLS_DIR = path.join(__dirname, "../school_district_data");
 
 const app = express();
 app.use(express.json());
+
+// ---------- Health check ----------
+// Responds with HTTP 200 and a tiny JSON payload. We register this **before**
+// the local‑only middleware so external orchestrators (Docker‑Compose,
+// Kubernetes, Heroku, etc.) can still probe the endpoint.
+app.get('/health', (_req: Request, res: any) => {
+	res.status(200).json({ status: 'ok' });
+});
+
 app.use(localOnlyMiddleware);
 
 // -----------------------------------------------------------------------------
