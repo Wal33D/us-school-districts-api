@@ -521,7 +521,10 @@ app.get("/school-district", async (req: Request, res: any) => {
 	
 	const result = await lookupSchoolDistrict(lat, lng);
 	console.log({ input: { lat, lng }, output: result })
-	res.json(result);
+	res.json({
+		...result,
+		coordinates: { lat, lng }
+	});
 });
 
 // -----------------------------------------------------------------------------

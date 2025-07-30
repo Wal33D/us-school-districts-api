@@ -94,7 +94,11 @@ curl "http://localhost:3712/school-district?lat=40.7128&lng=-74.0060"
 {
   "status": true,
   "districtId": "3620580",
-  "districtName": "New York City Geographic District # 2"
+  "districtName": "New York City Geographic District # 2",
+  "coordinates": {
+    "lat": 40.7128,
+    "lng": -74.0060
+  }
 }
 ```
 
@@ -115,7 +119,11 @@ Returns the school district information for a given coordinate.
 {
   "status": boolean,      // true if district found, false otherwise
   "districtId": string,   // NCES district ID (GEOID)
-  "districtName": string  // Official district name
+  "districtName": string, // Official district name
+  "coordinates": {        // Echo of input coordinates
+    "lat": number,
+    "lng": number
+  }
 }
 ```
 
