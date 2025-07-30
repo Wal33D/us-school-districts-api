@@ -27,52 +27,30 @@ import { point, booleanPointInPolygon, bbox as turfBbox, simplify } from "@turf/
 
 import type { Feature, Polygon, MultiPolygon } from "geojson";
 import type { SchoolDistrict, SchoolDistrictLookupResult } from "./types";
+import { LRUCache } from "./utils/LRUCache";
+import { config } from "./config";
+import { helmetMiddleware, rateLimitMiddleware, corsMiddleware } from "./middleware/security";
+import { logger } from "./utils/logger";
+import { errorHandler, asyncHandler } from "./middleware/errorHandler";
+import { ValidationError } from "./utils/errors";
 
 // -----------------------------------------------------------------------------
 // Configuration
 // -----------------------------------------------------------------------------
 
-const PORT = Number(process.env.PORT ?? 3712);
+const PORT = config.port;
 const SCHOOLS_DIR = path.join(__dirname, "../school_district_data");
 const CACHE_SIZE = 100; // Only cache 100 most recently used districts
 
-// -----------------------------------------------------------------------------
-// LRU Cache for geometry data
-// -----------------------------------------------------------------------------
-
-class LRUCache {
-	private maxSize: number;
-	private cache: Map<string, any>;
-
-	constructor(maxSize: number) {
-		this.maxSize = maxSize;
-		this.cache = new Map();
-	}
-
-	get(key: string): any {
-		if (!this.cache.has(key)) return undefined;
-		const value = this.cache.get(key);
-		this.cache.delete(key);
-		this.cache.set(key, value);
-		return value;
-	}
-
-	set(key: string, value: any): void {
-		if (this.cache.has(key)) {
-			this.cache.delete(key);
-		} else if (this.cache.size >= this.maxSize) {
-			const firstKey = this.cache.keys().next().value;
-			if (firstKey !== undefined) {
-				this.cache.delete(firstKey);
-			}
-		}
-		this.cache.set(key, value);
-	}
-}
-
-const geometryCache = new LRUCache(CACHE_SIZE);
+const geometryCache = new LRUCache<Polygon | MultiPolygon>(CACHE_SIZE);
 
 const app = express();
+
+// Security middleware (conditional based on config)
+app.use(helmetMiddleware);
+app.use(corsMiddleware);
+app.use(rateLimitMiddleware);
+
 app.use(express.json());
 
 // ---------- Health check ----------
@@ -212,7 +190,7 @@ async function buildSpatialIndex(shpPath: string, dbfPath: string) {
 		result = await source.read();
 	}
 	spatialIndex = index;
-	console.info(`[CACHE] Indexed ${count} districts (bbox only) → R‑tree size:`, index.all().length);
+	logger.info(`[CACHE] Indexed ${count} districts (bbox only) → R‑tree size: ${index.all().length}`);
 	const mem = process.memoryUsage();
 	console.info(`[MEM] Heap used ${(mem.heapUsed / 1024 / 1024).toFixed(1)} MB`);
 }

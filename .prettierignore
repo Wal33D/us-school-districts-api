@@ -1,0 +1,6 @@
+dist/
+node_modules/
+school_district_data/
+*.md
+package-lock.json
+ecosystem.config.js
