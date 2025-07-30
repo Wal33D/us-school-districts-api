@@ -46,6 +46,9 @@ const geometryCache = new LRUCache<Polygon | MultiPolygon>(CACHE_SIZE);
 
 const app = express();
 
+// Track active connections for graceful shutdown
+const connections = new Set<any>();
+
 // Security middleware (conditional based on config)
 app.use(helmetMiddleware);
 app.use(corsMiddleware);
@@ -53,11 +56,25 @@ app.use(rateLimitMiddleware);
 
 app.use(express.json());
 
+// Track connections
+app.use((req: any, res: any, next: any) => {
+	connections.add(res.connection);
+	res.on('finish', () => {
+		connections.delete(res.connection);
+	});
+	next();
+});
+
 // ---------- Health check ----------
 // Responds with HTTP 200 and a tiny JSON payload. We register this **before**
 // the local‑only middleware so external orchestrators (Docker‑Compose,
 // Kubernetes, Heroku, etc.) can still probe the endpoint.
 app.get('/health', (_req: Request, res: any) => {
+	// Set minimal caching for health check (5 seconds)
+	res.set({
+		'Cache-Control': 'public, max-age=5',
+		'X-Content-Type-Options': 'nosniff'
+	});
 	res.status(200).json({ status: 'ok' });
 });
 
@@ -263,6 +280,14 @@ async function lookupSchoolDistrict(lat: number, lng: number): Promise<SchoolDis
 app.get("/school-district", async (req: Request, res: any) => {
 	const lat = Number(req.query.lat);
 	const lng = Number(req.query.lng);
+	
+	// Set caching headers - cache for 7 days since school districts rarely change
+	res.set({
+		'Cache-Control': 'public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000',
+		'Vary': 'Accept-Encoding',
+		'X-Content-Type-Options': 'nosniff'
+	});
+	
 	if (Number.isNaN(lat) || Number.isNaN(lng)) {
 		return res.json({ status: false, districtId: null, districtName: null });
 	}
@@ -275,11 +300,13 @@ app.get("/school-district", async (req: Request, res: any) => {
 // Bootstrap
 // -----------------------------------------------------------------------------
 
+let server: any;
+
 (async () => {
 	try {
 		const { shpPath, dbfPath } = await ensureLatestData();
 		await buildSpatialIndex(shpPath, dbfPath);
-		app.listen(PORT, () => logger.info(`[READY] us-school-districts-api (optimized) listening on localhost:${PORT}`));
+		server = app.listen(PORT, () => logger.info(`[READY] us-school-districts-api (optimized) listening on localhost:${PORT}`));
 	} catch (err) {
 		console.error("[BOOT] Failed to start server:", err);
 		process.exit(1);
@@ -290,9 +317,61 @@ app.get("/school-district", async (req: Request, res: any) => {
 // Graceful shutdown
 // -----------------------------------------------------------------------------
 
-function shutdown(signal: string) {
-	console.info(`\n[SHUTDOWN] Caught ${signal}. Exiting…`);
-	process.exit(0);
+let isShuttingDown = false;
+
+async function shutdown(signal: string) {
+	if (isShuttingDown) {
+		console.info(`[SHUTDOWN] Already shutting down...`);
+		return;
+	}
+	
+	isShuttingDown = true;
+	console.info(`\n[SHUTDOWN] Caught ${signal}. Starting graceful shutdown...`);
+	
+	// Stop accepting new connections
+	if (server) {
+		server.close((err: any) => {
+			if (err) {
+				console.error('[SHUTDOWN] Error closing server:', err);
+				process.exit(1);
+			}
+			console.info('[SHUTDOWN] Server closed successfully');
+			process.exit(0);
+		});
+		
+		// Close all active connections
+		console.info(`[SHUTDOWN] Closing ${connections.size} active connections...`);
+		connections.forEach((connection) => {
+			connection.end();
+		});
+		
+		// Force destroy connections after 5 seconds
+		setTimeout(() => {
+			connections.forEach((connection) => {
+				connection.destroy();
+			});
+		}, 5000);
+		
+		// Force shutdown after 30 seconds
+		setTimeout(() => {
+			console.error('[SHUTDOWN] Could not close connections in time, forcefully shutting down');
+			process.exit(1);
+		}, 30000);
+	} else {
+		process.exit(0);
+	}
 }
+
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+// Handle uncaught errors
+process.on('uncaughtException', (err) => {
+	console.error('[ERROR] Uncaught exception:', err);
+	shutdown('UNCAUGHT_EXCEPTION');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+	console.error('[ERROR] Unhandled rejection at:', promise, 'reason:', reason);
+	shutdown('UNHANDLED_REJECTION');
+});
