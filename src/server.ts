@@ -21,6 +21,7 @@ import Rbush from "rbush";
 import unzipper from "unzipper";
 import * as shapefile from "shapefile";
 import express, { Request } from "express";
+import compression from "compression";
 import { localOnlyMiddleware } from "./middleware/localOnlyMiddleware";
 import { createWriteStream, rmSync } from "fs";
 import { point, booleanPointInPolygon, bbox as turfBbox, simplify } from "@turf/turf";
@@ -48,6 +49,12 @@ const app = express();
 
 // Track active connections for graceful shutdown
 const connections = new Set<any>();
+
+// Compression middleware - compress all responses
+app.use(compression({
+	threshold: 1024, // Only compress responses larger than 1KB
+	level: 6 // Default compression level (1-9, where 9 is maximum compression)
+}));
 
 // Security middleware (conditional based on config)
 app.use(helmetMiddleware);
