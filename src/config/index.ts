@@ -11,7 +11,7 @@ const envSchema = Joi.object({
 	NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
 
 	// Security
-	ENABLE_SECURITY_MIDDLEWARE: Joi.boolean().default(true),
+	ENABLE_SECURITY_MIDDLEWARE: Joi.boolean().default(false),
 	BYPASS_IPS: Joi.string().default('127.0.0.1,::1,localhost'),
 
 	// Rate Limiting

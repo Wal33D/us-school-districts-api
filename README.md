@@ -168,9 +168,24 @@ candycomp-us-school-districts-api/
 
 ### Environment Variables
 
+Create a `.env` file based on `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `PORT` | Server port | `3712` |
+| `NODE_ENV` | Environment (development/production) | `development` |
+| `ENABLE_SECURITY_MIDDLEWARE` | Enable security features | `false` |
+| `BYPASS_IPS` | IPs that bypass rate limiting | `127.0.0.1,::1,localhost` |
+| `RATE_LIMIT_WINDOW_MS` | Rate limit time window | `60000` |
+| `RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `100` |
+| `CORS_ALLOWED_ORIGINS` | Allowed CORS origins | `*` |
+| `LOG_LEVEL` | Logging level | `info` |
+
+**Note**: Security middleware is disabled by default to maintain compatibility with existing deployments. Enable it by setting `ENABLE_SECURITY_MIDDLEWARE=true` in production.
 
 ### Scripts
 
