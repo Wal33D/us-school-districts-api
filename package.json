@@ -3,6 +3,9 @@
 	"version": "1.0.21",
 	"description": "High-performance, memory-optimized API for US school district lookups using official NCES boundary data",
 	"main": "dist/server.js",
+	"bin": {
+		"school-district-cli": "./dist/cli.js"
+	},
 	"esModuleInterop": true,
 	"scripts": {
 		"start": "node dist/server.js",
@@ -15,7 +18,8 @@
 		"lint:fix": "eslint 'src/**/*.{ts,tsx}' --fix",
 		"format": "prettier --write 'src/**/*.{ts,tsx,json}'",
 		"format:check": "prettier --check 'src/**/*.{ts,tsx,json}'",
-		"prepare": "husky"
+		"prepare": "husky",
+		"cli": "ts-node src/cli.ts"
 	},
 	"nodemonConfig": {
 		"watch": [
@@ -63,6 +67,7 @@
 		"@turf/simplify": "^7.2.0",
 		"@turf/turf": "^7.2.0",
 		"@types/compression": "^1.8.1",
+		"commander": "^14.0.0",
 		"compression": "^1.8.1",
 		"cors": "^2.8.5",
 		"dotenv": "^17.2.1",
