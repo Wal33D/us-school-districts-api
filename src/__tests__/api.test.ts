@@ -1,5 +1,5 @@
 import request from 'supertest';
-import express from 'express';
+import express, { Request } from 'express';
 
 // Mock the spatial index and lookup function
 const mockLookupResult = {
@@ -14,12 +14,12 @@ function createTestApp() {
 	app.use(express.json());
 
 	// Health check endpoint
-	app.get('/health', (_req, res) => {
+	app.get('/health', (_req: Request, res: any) => {
 		res.status(200).json({ status: 'ok' });
 	});
 
 	// School district endpoint
-	app.get('/school-district', (req, res) => {
+	app.get('/school-district', (req: Request, res: any) => {
 		const lat = Number(req.query.lat);
 		const lng = Number(req.query.lng);
 

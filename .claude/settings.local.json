@@ -68,7 +68,9 @@
       "Bash(npx husky init:*)",
       "Bash(mkdir:*)",
       "Bash(git rebase:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(gh run list:*)",
+      "Bash(npm test)"
     ],
     "deny": []
   }
