@@ -124,32 +124,119 @@ async function fileExists(p: string) {
 	}
 }
 
-async function download(url: string, dest: string) {
-	const res = await fetch(url);
-	if (!res.ok || !res.body) throw new Error(`Failed to download ${url}: ${res.statusText}`);
-	await new Promise<void>((resolve, reject) => {
-		const stream = createWriteStream(dest);
-		res.body.pipe(stream);
-		res.body.on("error", reject);
-		stream.on("finish", resolve);
-	});
+async function download(url: string, dest: string, maxRetries: number = 3) {
+	let lastError: Error | null = null;
+	
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			logger.info(`[DOWNLOAD] Attempt ${attempt}/${maxRetries} for ${url}`);
+			
+			const res = await fetch(url, {
+				timeout: 60000, // 60 second timeout
+				size: 500 * 1024 * 1024 // Max 500MB
+			});
+			
+			if (!res.ok || !res.body) {
+				throw new Error(`Failed to download ${url}: ${res.statusText} (${res.status})`);
+			}
+			
+			await new Promise<void>((resolve, reject) => {
+				const stream = createWriteStream(dest);
+				let downloadedBytes = 0;
+				
+				res.body.on('data', (chunk: Buffer) => {
+					downloadedBytes += chunk.length;
+					if (downloadedBytes % (10 * 1024 * 1024) === 0) { // Log every 10MB
+						logger.info(`[DOWNLOAD] Progress: ${(downloadedBytes / 1024 / 1024).toFixed(1)}MB`);
+					}
+				});
+				
+				res.body.pipe(stream);
+				res.body.on("error", reject);
+				stream.on("finish", () => {
+					logger.info(`[DOWNLOAD] Completed: ${(downloadedBytes / 1024 / 1024).toFixed(1)}MB`);
+					resolve();
+				});
+				stream.on("error", reject);
+			});
+			
+			// Success - return early
+			return;
+			
+		} catch (error) {
+			lastError = error as Error;
+			logger.error(`[DOWNLOAD] Attempt ${attempt} failed:`, error);
+			
+			// Clean up partial download
+			try {
+				await fs.unlink(dest);
+			} catch {}
+			
+			if (attempt < maxRetries) {
+				// Exponential backoff: 2s, 4s, 8s...
+				const delay = Math.pow(2, attempt) * 1000;
+				logger.info(`[DOWNLOAD] Retrying in ${delay / 1000}s...`);
+				await new Promise(resolve => setTimeout(resolve, delay));
+			}
+		}
+	}
+	
+	throw new Error(`Failed to download after ${maxRetries} attempts: ${lastError?.message}`);
 }
 
-async function extract(zipPath: string, needed: string[]) {
-	const directory = await unzipper.Open.file(zipPath);
-	await Promise.all(
-		directory.files.map((file) => {
-			if (!needed.includes(file.path)) return (file as any).autodrain?.(), Promise.resolve();
-			const dest = path.join(SCHOOLS_DIR, file.path);
-			return new Promise<void>((resolve, reject) => {
-				file
-					.stream()
-					.pipe(createWriteStream(dest))
-					.on("close", resolve)
-					.on("error", reject);
-			});
-		})
-	);
+async function extract(zipPath: string, needed: string[], maxRetries: number = 3) {
+	let lastError: Error | null = null;
+	
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			logger.info(`[EXTRACT] Attempt ${attempt}/${maxRetries} for ${zipPath}`);
+			
+			const directory = await unzipper.Open.file(zipPath);
+			await Promise.all(
+				directory.files.map((file) => {
+					if (!needed.includes(file.path)) {
+						return (file as any).autodrain?.(), Promise.resolve();
+					}
+					
+					const dest = path.join(SCHOOLS_DIR, file.path);
+					logger.info(`[EXTRACT] Extracting ${file.path}`);
+					
+					return new Promise<void>((resolve, reject) => {
+						file
+							.stream()
+							.pipe(createWriteStream(dest))
+							.on("close", () => {
+								logger.info(`[EXTRACT] Completed ${file.path}`);
+								resolve();
+							})
+							.on("error", reject);
+					});
+				})
+			);
+			
+			// Success - return early
+			return;
+			
+		} catch (error) {
+			lastError = error as Error;
+			logger.error(`[EXTRACT] Attempt ${attempt} failed:`, error);
+			
+			// Clean up partial extracts
+			for (const fileName of needed) {
+				try {
+					await fs.unlink(path.join(SCHOOLS_DIR, fileName));
+				} catch {}
+			}
+			
+			if (attempt < maxRetries) {
+				const delay = Math.pow(2, attempt) * 1000;
+				logger.info(`[EXTRACT] Retrying in ${delay / 1000}s...`);
+				await new Promise(resolve => setTimeout(resolve, delay));
+			}
+		}
+	}
+	
+	throw new Error(`Failed to extract after ${maxRetries} attempts: ${lastError?.message}`);
 }
 
 async function ensureLatestData() {
