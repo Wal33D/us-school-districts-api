@@ -371,6 +371,110 @@ async function lookupSchoolDistrict(lat: number, lng: number): Promise<SchoolDis
 // Routes
 // -----------------------------------------------------------------------------
 
+// Batch lookup endpoint
+app.post("/school-districts/batch", async (req: Request, res: any) => {
+	// Set caching headers
+	res.set({
+		'Cache-Control': 'public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000',
+		'Vary': 'Accept-Encoding, Content-Type',
+		'X-Content-Type-Options': 'nosniff'
+	});
+	
+	// Validate request body
+	if (!Array.isArray(req.body)) {
+		return res.status(400).json({
+			error: 'Request body must be an array of coordinate objects'
+		});
+	}
+	
+	if (req.body.length === 0) {
+		return res.status(400).json({
+			error: 'Request body must contain at least one coordinate'
+		});
+	}
+	
+	if (req.body.length > 100) {
+		return res.status(400).json({
+			error: 'Maximum 100 coordinates allowed per batch request'
+		});
+	}
+	
+	// Process each coordinate
+	const results = await Promise.all(
+		req.body.map(async (coord: any, index: number) => {
+			// Validate coordinate structure
+			if (typeof coord !== 'object' || coord === null) {
+				return {
+					index,
+					error: 'Invalid coordinate object',
+					status: false,
+					districtId: null,
+					districtName: null
+				};
+			}
+			
+			const lat = Number(coord.lat || coord.latitude);
+			const lng = Number(coord.lng || coord.longitude || coord.lon);
+			
+			// Validate numbers
+			if (Number.isNaN(lat) || Number.isNaN(lng)) {
+				return {
+					index,
+					error: 'Invalid coordinates: lat and lng must be numbers',
+					status: false,
+					districtId: null,
+					districtName: null
+				};
+			}
+			
+			// Validate bounds
+			if (lat < 18 || lat > 72) {
+				return {
+					index,
+					error: 'Latitude out of bounds for US territories (18 to 72)',
+					status: false,
+					districtId: null,
+					districtName: null
+				};
+			}
+			
+			if (lng < -180 || lng > -65) {
+				return {
+					index,
+					error: 'Longitude out of bounds for US territories (-180 to -65)',
+					status: false,
+					districtId: null,
+					districtName: null
+				};
+			}
+			
+			// Perform lookup
+			try {
+				const result = await lookupSchoolDistrict(lat, lng);
+				return {
+					index,
+					...result,
+					coordinates: { lat, lng }
+				};
+			} catch (error) {
+				logger.error(`[BATCH] Error processing coordinate ${index}:`, error);
+				return {
+					index,
+					error: 'Internal error during lookup',
+					status: false,
+					districtId: null,
+					districtName: null
+				};
+			}
+		})
+	);
+	
+	res.json({
+		count: results.length,
+		results
+	});
+});
+
 app.get("/school-district", async (req: Request, res: any) => {
 	const lat = Number(req.query.lat);
 	const lng = Number(req.query.lng);
