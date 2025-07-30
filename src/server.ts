@@ -288,9 +288,39 @@ app.get("/school-district", async (req: Request, res: any) => {
 		'X-Content-Type-Options': 'nosniff'
 	});
 	
+	// Validate input
 	if (Number.isNaN(lat) || Number.isNaN(lng)) {
-		return res.json({ status: false, districtId: null, districtName: null });
+		return res.status(400).json({ 
+			status: false, 
+			error: 'Invalid coordinates: lat and lng must be numbers',
+			districtId: null, 
+			districtName: null 
+		});
 	}
+	
+	// Validate lat/lng bounds
+	// Latitude: -90 to 90, Longitude: -180 to 180
+	// For US school districts, we can be more restrictive:
+	// Continental US roughly: lat 24-49, lng -125 to -66
+	// With Alaska/Hawaii: lat 18-72, lng -180 to -65
+	if (lat < 18 || lat > 72) {
+		return res.status(400).json({ 
+			status: false, 
+			error: 'Latitude out of bounds for US territories (18 to 72)',
+			districtId: null, 
+			districtName: null 
+		});
+	}
+	
+	if (lng < -180 || lng > -65) {
+		return res.status(400).json({ 
+			status: false, 
+			error: 'Longitude out of bounds for US territories (-180 to -65)',
+			districtId: null, 
+			districtName: null 
+		});
+	}
+	
 	const result = await lookupSchoolDistrict(lat, lng);
 	console.log({ input: { lat, lng }, output: result })
 	res.json(result);
