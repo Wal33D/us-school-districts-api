@@ -24,15 +24,28 @@ function createTestApp() {
 		const lng = Number(req.query.lng);
 
 		if (Number.isNaN(lat) || Number.isNaN(lng)) {
-			return res.json({ status: false, districtId: null, districtName: null });
+			return res.json({ 
+				status: false, 
+				districtId: null, 
+				districtName: null,
+				coordinates: { lat, lng }
+			});
 		}
 
 		// Mock lookup based on coordinates
 		if (lat === 42.658529 && lng === -86.206886) {
-			return res.json(mockLookupResult);
+			return res.json({
+				...mockLookupResult,
+				coordinates: { lat, lng }
+			});
 		}
 
-		res.json({ status: false, districtId: null, districtName: null });
+		res.json({ 
+			status: false, 
+			districtId: null, 
+			districtName: null,
+			coordinates: { lat, lng }
+		});
 	});
 
 	return app;
@@ -66,6 +79,7 @@ describe('API Endpoints', () => {
 				status: true,
 				districtId: '2630960',
 				districtName: 'Saugatuck Public Schools',
+				coordinates: { lat: 42.658529, lng: -86.206886 }
 			});
 		});
 
@@ -79,6 +93,7 @@ describe('API Endpoints', () => {
 				status: false,
 				districtId: null,
 				districtName: null,
+				coordinates: { lat: 0, lng: 0 }
 			});
 		});
 
@@ -92,6 +107,7 @@ describe('API Endpoints', () => {
 				status: false,
 				districtId: null,
 				districtName: null,
+				coordinates: { lat: null, lng: -86.206886 }
 			});
 		});
 
@@ -105,6 +121,7 @@ describe('API Endpoints', () => {
 				status: false,
 				districtId: null,
 				districtName: null,
+				coordinates: { lat: 42.658529, lng: null }
 			});
 		});
 
@@ -118,6 +135,7 @@ describe('API Endpoints', () => {
 				status: false,
 				districtId: null,
 				districtName: null,
+				coordinates: { lat: null, lng: -86.206886 }
 			});
 		});
 
@@ -131,6 +149,7 @@ describe('API Endpoints', () => {
 				status: false,
 				districtId: null,
 				districtName: null,
+				coordinates: { lat: 42.658529, lng: null }
 			});
 		});
 
@@ -143,6 +162,7 @@ describe('API Endpoints', () => {
 				status: false,
 				districtId: null,
 				districtName: null,
+				coordinates: { lat: null, lng: null }
 			});
 		});
 	});

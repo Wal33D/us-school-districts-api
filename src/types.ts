@@ -11,3 +11,10 @@ export interface SchoolDistrictLookupResult {
     districtId: string | null;
     districtName: string | null;
 }
+
+export interface SchoolDistrictLookupResultWithCoordinates extends SchoolDistrictLookupResult {
+    coordinates: {
+        lat: number;
+        lng: number;
+    };
+}
