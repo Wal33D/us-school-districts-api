@@ -23,7 +23,7 @@ import * as shapefile from "shapefile";
 import express, { Request } from "express";
 import { localOnlyMiddleware } from "./middleware/localOnlyMiddleware";
 import { createWriteStream, rmSync } from "fs";
-import { point, booleanPointInPolygon, bbox as turfBbox } from "@turf/turf";
+import { point, booleanPointInPolygon, bbox as turfBbox, simplify } from "@turf/turf";
 
 import type { Feature, Polygon, MultiPolygon } from "geojson";
 import type { SchoolDistrict, SchoolDistrictLookupResult } from "./types";
@@ -34,6 +34,43 @@ import type { SchoolDistrict, SchoolDistrictLookupResult } from "./types";
 
 const PORT = Number(process.env.PORT ?? 3712);
 const SCHOOLS_DIR = path.join(__dirname, "../school_district_data");
+const CACHE_SIZE = 100; // Only cache 100 most recently used districts
+
+// -----------------------------------------------------------------------------
+// LRU Cache for geometry data
+// -----------------------------------------------------------------------------
+
+class LRUCache {
+	private maxSize: number;
+	private cache: Map<string, any>;
+
+	constructor(maxSize: number) {
+		this.maxSize = maxSize;
+		this.cache = new Map();
+	}
+
+	get(key: string): any {
+		if (!this.cache.has(key)) return undefined;
+		const value = this.cache.get(key);
+		this.cache.delete(key);
+		this.cache.set(key, value);
+		return value;
+	}
+
+	set(key: string, value: any): void {
+		if (this.cache.has(key)) {
+			this.cache.delete(key);
+		} else if (this.cache.size >= this.maxSize) {
+			const firstKey = this.cache.keys().next().value;
+			if (firstKey !== undefined) {
+				this.cache.delete(firstKey);
+			}
+		}
+		this.cache.set(key, value);
+	}
+}
+
+const geometryCache = new LRUCache(CACHE_SIZE);
 
 const app = express();
 app.use(express.json());
@@ -132,46 +169,93 @@ async function ensureLatestData() {
 // Spatial index – R‑tree storing bounding box + district meta.
 // -----------------------------------------------------------------------------
 
+type DistrictMetadata = {
+	districtId: string;
+	name: string;
+	recordIndex: number;
+};
+
 type IndexedDistrict = {
 	minX: number;
 	minY: number;
 	maxX: number;
 	maxY: number;
-	district: SchoolDistrict;
+	metadata: DistrictMetadata;
 };
 
 let spatialIndex: Rbush<IndexedDistrict> | null = null;
+let shapefilePaths: { shpPath: string; dbfPath: string } | null = null;
 
 async function buildSpatialIndex(shpPath: string, dbfPath: string) {
 	const index = new Rbush<IndexedDistrict>();
 	const source = await shapefile.open(shpPath, dbfPath);
 	let result = await source.read();
 	let count = 0;
+	let recordIndex = 0;
+	
+	// Store the shapefile paths for later geometry loading
+	shapefilePaths = { shpPath, dbfPath };
+	
 	while (!result.done) {
 		const feat = result.value as Feature<Polygon | MultiPolygon, any>;
 		if (feat?.geometry && (feat.geometry.type === "Polygon" || feat.geometry.type === "MultiPolygon")) {
 			const [minX, minY, maxX, maxY] = turfBbox(feat.geometry);
-			const district: SchoolDistrict = {
+			const metadata: DistrictMetadata = {
 				districtId: feat.properties?.GEOID,
 				name: feat.properties?.NAME,
-				geometry: feat.geometry,
+				recordIndex: recordIndex,
 			};
-			index.insert({ minX, minY, maxX, maxY, district });
+			index.insert({ minX, minY, maxX, maxY, metadata });
 			count += 1;
 		}
+		recordIndex++;
 		result = await source.read();
 	}
 	spatialIndex = index;
-	console.info(`[CACHE] Indexed ${count} districts → R‑tree size:`, index.all().length);
+	console.info(`[CACHE] Indexed ${count} districts (bbox only) → R‑tree size:`, index.all().length);
 	const mem = process.memoryUsage();
 	console.info(`[MEM] Heap used ${(mem.heapUsed / 1024 / 1024).toFixed(1)} MB`);
+}
+
+// -----------------------------------------------------------------------------
+// On-demand geometry loading
+// -----------------------------------------------------------------------------
+
+async function loadDistrictGeometry(recordIndex: number): Promise<Polygon | MultiPolygon | null> {
+	const cacheKey = `geometry_${recordIndex}`;
+	const cached = geometryCache.get(cacheKey);
+	if (cached) return cached;
+	
+	if (!shapefilePaths) {
+		console.error("[GEOMETRY] Shapefile paths not available");
+		return null;
+	}
+	
+	const source = await shapefile.open(shapefilePaths.shpPath, shapefilePaths.dbfPath);
+	let result = await source.read();
+	let currentIndex = 0;
+	
+	while (!result.done && currentIndex < recordIndex) {
+		result = await source.read();
+		currentIndex++;
+	}
+	
+	if (!result.done && result.value?.geometry) {
+		// Simplify geometry to reduce memory usage
+		const geom = result.value.geometry as Polygon | MultiPolygon;
+		const simplified = simplify(geom, { tolerance: 0.001, highQuality: false }) as Polygon | MultiPolygon;
+		geometryCache.set(cacheKey, simplified);
+		return simplified;
+	}
+	
+	return null;
 }
 
 // -----------------------------------------------------------------------------
 // Lookup helper
 // -----------------------------------------------------------------------------
 
-function lookupSchoolDistrict(lat: number, lng: number): SchoolDistrictLookupResult {
+async function lookupSchoolDistrict(lat: number, lng: number): Promise<SchoolDistrictLookupResult> {
 	if (!spatialIndex) {
 		console.error("[LOOKUP] Spatial index not ready");
 		return { status: false, districtId: null, districtName: null };
@@ -179,9 +263,16 @@ function lookupSchoolDistrict(lat: number, lng: number): SchoolDistrictLookupRes
 
 	const candidates = spatialIndex.search({ minX: lng, minY: lat, maxX: lng, maxY: lat });
 	const pt = point([lng, lat]);
+	
 	for (const c of candidates) {
-		if (booleanPointInPolygon(pt, c.district.geometry)) {
-			return { status: true, districtId: c.district.districtId, districtName: c.district.name };
+		// Load geometry on-demand
+		const geometry = await loadDistrictGeometry(c.metadata.recordIndex);
+		if (geometry && booleanPointInPolygon(pt, geometry)) {
+			return { 
+				status: true, 
+				districtId: c.metadata.districtId, 
+				districtName: c.metadata.name 
+			};
 		}
 	}
 	return { status: false, districtId: null, districtName: null };
@@ -191,13 +282,13 @@ function lookupSchoolDistrict(lat: number, lng: number): SchoolDistrictLookupRes
 // Routes
 // -----------------------------------------------------------------------------
 
-app.get("/school-district", (req: Request, res: any) => {
+app.get("/school-district", async (req: Request, res: any) => {
 	const lat = Number(req.query.lat);
 	const lng = Number(req.query.lng);
 	if (Number.isNaN(lat) || Number.isNaN(lng)) {
 		return res.json({ status: false, districtId: null, districtName: null });
 	}
-	const result = lookupSchoolDistrict(lat, lng);
+	const result = await lookupSchoolDistrict(lat, lng);
 	console.log({ input: { lat, lng }, output: result })
 	res.json(result);
 });
@@ -210,7 +301,7 @@ app.get("/school-district", (req: Request, res: any) => {
 	try {
 		const { shpPath, dbfPath } = await ensureLatestData();
 		await buildSpatialIndex(shpPath, dbfPath);
-		app.listen(PORT, () => console.info(`[READY] candycomp-us-school-districts-api listening on localhost:${PORT}`));
+		app.listen(PORT, () => console.info(`[READY] candycomp-us-school-districts-api (optimized) listening on localhost:${PORT}`));
 	} catch (err) {
 		console.error("[BOOT] Failed to start server:", err);
 		process.exit(1);
