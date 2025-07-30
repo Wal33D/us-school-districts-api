@@ -1,6 +1,6 @@
 {
 	"name": "us-school-districts-api",
-	"version": "1.0.21",
+	"version": "0.1.6",
 	"description": "High-performance, memory-optimized API for US school district lookups using official NCES boundary data",
 	"main": "dist/server.js",
 	"bin": {
