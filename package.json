@@ -1,7 +1,7 @@
 {
-	"name": "candycomp-us-school-districts-api",
+	"name": "us-school-districts-api",
 	"version": "1.0.21",
-	"description": "A lightweight in-memory lookup service for United States school districts. It loads government-verified shapefile data for efficient geospatial queries.",
+	"description": "High-performance, memory-optimized API for US school district lookups using official NCES boundary data",
 	"main": "dist/server.js",
 	"esModuleInterop": true,
 	"scripts": {
@@ -27,6 +27,27 @@
 		]
 	},
 	"license": "MIT",
+	"author": "Waleed Judah <waleed@glitchgaming.us>",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Wal33D/us-school-districts-api.git"
+	},
+	"bugs": {
+		"url": "https://github.com/Wal33D/us-school-districts-api/issues"
+	},
+	"homepage": "https://github.com/Wal33D/us-school-districts-api#readme",
+	"keywords": [
+		"api",
+		"school-districts",
+		"geospatial",
+		"education",
+		"nces",
+		"gis",
+		"nodejs",
+		"typescript",
+		"express",
+		"rest-api"
+	],
 	"lint-staged": {
 		"*.{ts,tsx}": [
 			"eslint --fix",

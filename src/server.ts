@@ -279,7 +279,7 @@ app.get("/school-district", async (req: Request, res: any) => {
 	try {
 		const { shpPath, dbfPath } = await ensureLatestData();
 		await buildSpatialIndex(shpPath, dbfPath);
-		app.listen(PORT, () => console.info(`[READY] candycomp-us-school-districts-api (optimized) listening on localhost:${PORT}`));
+		app.listen(PORT, () => logger.info(`[READY] us-school-districts-api (optimized) listening on localhost:${PORT}`));
 	} catch (err) {
 		console.error("[BOOT] Failed to start server:", err);
 		process.exit(1);

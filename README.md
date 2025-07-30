@@ -35,8 +35,8 @@ A high-performance, memory-optimized API service for looking up US school distri
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/candycomp-us-school-districts-api.git
-cd candycomp-us-school-districts-api
+git clone https://github.com/Wal33D/us-school-districts-api.git
+cd us-school-districts-api
 ```
 
 2. Install dependencies:
@@ -269,4 +269,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 For issues, questions, or contributions, please visit:
-- GitHub Issues: [github.com/yourusername/candycomp-us-school-districts-api/issues](https://github.com/yourusername/candycomp-us-school-districts-api/issues)
+- GitHub Issues: [github.com/Wal33D/us-school-districts-api/issues](https://github.com/Wal33D/us-school-districts-api/issues)

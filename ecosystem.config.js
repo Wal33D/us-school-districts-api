@@ -3,7 +3,7 @@
 module.exports = {
 	apps: [
 		{
-			name: 'candycomp-us-school-districts-api',
+			name: 'us-school-districts-api',
 			script: 'dist/server.js',
 			exec_mode: 'cluster',
 			watch: false,

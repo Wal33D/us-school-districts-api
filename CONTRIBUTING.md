@@ -27,8 +27,8 @@ By participating in this project, you agree to maintain a respectful and inclusi
 1. **Fork the repository** on GitHub
 2. **Clone your fork** locally:
    ```bash
-   git clone https://github.com/yourusername/candycomp-us-school-districts-api.git
-   cd candycomp-us-school-districts-api
+   git clone https://github.com/yourusername/us-school-districts-api.git
+   cd us-school-districts-api
    ```
 
 3. **Install dependencies**:
@@ -50,7 +50,7 @@ By participating in this project, you agree to maintain a respectful and inclusi
 
 ### 1. Before You Start
 
-- Check existing [issues](https://github.com/Wal33D/candycomp-us-school-districts-api/issues) to avoid duplicating work
+- Check existing [issues](https://github.com/Wal33D/us-school-districts-api/issues) to avoid duplicating work
 - For significant changes, open an issue first to discuss your proposal
 - Ensure your development environment is properly configured
 
