@@ -1,59 +1,108 @@
 import winston from 'winston';
+import path from 'path';
 import { config } from '../config';
 
-const levels = {
-	error: 0,
-	warn: 1,
-	info: 2,
-	http: 3,
-	debug: 4,
-};
+const { combine, timestamp, printf, colorize, errors } = winston.format;
 
-const level = () => {
-	return config.logging.level || 'info';
-};
+// Safe JSON stringify that handles circular references
+function safeStringify(obj: unknown): string {
+  const seen = new WeakSet();
+  return JSON.stringify(obj, (key, value) => {
+    // Handle circular references
+    if (typeof value === 'object' && value !== null) {
+      if (seen.has(value)) {
+        return '[Circular Reference]';
+      }
+      seen.add(value);
+    }
 
-const colors = {
-	error: 'red',
-	warn: 'yellow',
-	info: 'green',
-	http: 'magenta',
-	debug: 'white',
-};
+    // Handle common problematic objects
+    if (value instanceof Error) {
+      return {
+        name: value.name,
+        message: value.message,
+        stack: value.stack,
+      };
+    }
 
-winston.addColors(colors);
+    // Skip certain keys that often cause issues
+    if (
+      key === 'socket' ||
+      key === 'connection' ||
+      key === 'agent' ||
+      key === 'request' ||
+      key === 'response'
+    ) {
+      return '[Omitted]';
+    }
 
-const format = winston.format.combine(
-	winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
-	winston.format.colorize({ all: true }),
-	winston.format.printf((info) => `${info.timestamp} ${info.level}: ${info.message}`)
-);
+    return value;
+  });
+}
 
-const transports = [
-	new winston.transports.Console(),
-	// Add file transports in production
-	...(config.isProduction
-		? [
-				new winston.transports.File({
-					filename: 'error.log',
-					level: 'error',
-				}),
-				new winston.transports.File({ filename: 'all.log' }),
-		  ]
-		: []),
-];
+// Custom log format
+const logFormat = printf(({ level, message, timestamp, stack, ...metadata }) => {
+  let log = `${timestamp} [${level}]: ${message}`;
 
-export const logger = winston.createLogger({
-	level: level(),
-	levels,
-	format,
-	transports,
+  // Add metadata if present
+  if (Object.keys(metadata).length > 0) {
+    try {
+      log += ` ${safeStringify(metadata)}`;
+    } catch (error) {
+      log += ` [Error stringifying metadata: ${error instanceof Error ? error.message : 'Unknown error'}]`;
+    }
+  }
+
+  // Add stack trace if present (for errors)
+  if (stack) {
+    log += `\n${stack}`;
+  }
+
+  return log;
 });
 
-// Create a stream object with a 'write' function that will be used by morgan
+// Create the logger
+export const logger = winston.createLogger({
+  level: config.logging.level || 'info',
+  format: combine(errors({ stack: true }), timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), logFormat),
+  transports: [
+    // Console transport
+    new winston.transports.Console({
+      format: combine(
+        colorize(),
+        errors({ stack: true }),
+        timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+        logFormat
+      ),
+    }),
+  ],
+});
+
+// Add file transport in production
+if (config.isProduction) {
+  logger.add(
+    new winston.transports.File({
+      filename: path.join('logs', 'error.log'),
+      level: 'error',
+      maxsize: 5242880, // 5MB
+      maxFiles: 5,
+    })
+  );
+
+  logger.add(
+    new winston.transports.File({
+      filename: path.join('logs', 'combined.log'),
+      maxsize: 5242880, // 5MB
+      maxFiles: 5,
+    })
+  );
+}
+
+// Create a stream object for Morgan middleware
 export const stream = {
-	write: (message: string) => {
-		// Remove newline character at the end
-		logger.http(message.trim());
-	},
+  write: (message: string) => {
+    logger.info(message.trim());
+  },
 };
+
+export default logger;

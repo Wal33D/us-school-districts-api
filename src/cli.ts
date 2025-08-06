@@ -25,21 +25,21 @@ program
     try {
       const lat = parseFloat(options.latitude);
       const lng = parseFloat(options.longitude);
-      
+
       if (isNaN(lat) || isNaN(lng)) {
         console.error('Error: Latitude and longitude must be valid numbers');
         process.exit(1);
       }
-      
+
       console.log(`Looking up school district for: ${lat}, ${lng}`);
       console.log(`Using API at: ${options.host}`);
-      
+
       const response = await fetch(`${options.host}/school-district?lat=${lat}&lng=${lng}`);
       const data = await response.json();
-      
+
       console.log('\nResult:');
       console.log(JSON.stringify(data, null, 2));
-      
+
       if (data.status) {
         console.log(`\n✓ Found district: ${data.districtName} (ID: ${data.districtId})`);
       } else {
@@ -65,16 +65,18 @@ program
       const fs = await import('fs/promises');
       const fileContent = await fs.readFile(options.file, 'utf-8');
       const coordinates = JSON.parse(fileContent);
-      
+
       if (!Array.isArray(coordinates)) {
         console.error('Error: File must contain a JSON array of coordinate objects');
-        console.error('Example: [{"lat": 40.7128, "lng": -74.0060}, {"lat": 34.0522, "lng": -118.2437}]');
+        console.error(
+          'Example: [{"lat": 40.7128, "lng": -74.0060}, {"lat": 34.0522, "lng": -118.2437}]'
+        );
         process.exit(1);
       }
-      
+
       console.log(`Processing ${coordinates.length} coordinates...`);
       console.log(`Using API at: ${options.host}`);
-      
+
       const response = await fetch(`${options.host}/school-districts/batch`, {
         method: 'POST',
         headers: {
@@ -82,27 +84,30 @@ program
         },
         body: JSON.stringify(coordinates),
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
         console.error('Error:', data.error || 'Unknown error');
         process.exit(1);
       }
-      
+
       console.log(`\nProcessed ${data.count} coordinates:`);
-      
+
       data.results.forEach((result: any) => {
         if (result.status) {
-          console.log(`  [${result.index}] ✓ ${result.districtName} (${result.districtId}) - ${result.coordinates.lat}, ${result.coordinates.lng}`);
+          console.log(
+            `  [${result.index}] ✓ ${result.districtName} (${result.districtId}) - ${result.coordinates.lat}, ${result.coordinates.lng}`
+          );
         } else {
-          console.log(`  [${result.index}] ✗ No district found - ${result.error || 'Unknown location'}`);
+          console.log(
+            `  [${result.index}] ✗ No district found - ${result.error || 'Unknown location'}`
+          );
         }
       });
-      
+
       const successful = data.results.filter((r: any) => r.status).length;
       console.log(`\nSummary: ${successful}/${data.count} successful lookups`);
-      
     } catch (error) {
       console.error('Error:', error);
       process.exit(1);
@@ -115,20 +120,22 @@ program
   .option('--host <string>', 'API host', `http://localhost:${config.port}`)
   .action(async (options: any) => {
     console.log('Running test with sample US coordinates...\n');
-    
+
     const testCoordinates = [
-      { name: 'New York City', lat: 40.7128, lng: -74.0060 },
+      { name: 'New York City', lat: 40.7128, lng: -74.006 },
       { name: 'Los Angeles', lat: 34.0522, lng: -118.2437 },
       { name: 'Chicago', lat: 41.8781, lng: -87.6298 },
       { name: 'Houston', lat: 29.7604, lng: -95.3698 },
-      { name: 'Phoenix', lat: 33.4484, lng: -112.0740 },
+      { name: 'Phoenix', lat: 33.4484, lng: -112.074 },
     ];
-    
+
     for (const coord of testCoordinates) {
       try {
-        const response = await fetch(`${options.host}/school-district?lat=${coord.lat}&lng=${coord.lng}`);
+        const response = await fetch(
+          `${options.host}/school-district?lat=${coord.lat}&lng=${coord.lng}`
+        );
         const data = await response.json();
-        
+
         if (data.status) {
           console.log(`✓ ${coord.name}: ${data.districtName} (${data.districtId})`);
         } else {
@@ -149,7 +156,7 @@ program
       console.log(`Checking API health at: ${options.host}`);
       const response = await fetch(`${options.host}/health`);
       const data = await response.json();
-      
+
       if (response.ok && data.status === 'ok') {
         console.log('✓ API is healthy and running');
       } else {
