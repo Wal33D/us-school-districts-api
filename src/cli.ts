@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import fetch from 'node-fetch';
 import { config } from './config';
+import type { LookupOptions, BatchOptions, TestOptions, HealthOptions, BatchResult } from './types';
 
 const program = new Command();
 
@@ -17,7 +18,7 @@ program
   .option('--lat, --latitude <number>', 'Latitude coordinate')
   .option('--lng, --longitude <number>', 'Longitude coordinate')
   .option('--host <string>', 'API host', `http://localhost:${config.port}`)
-  .action(async (options: any) => {
+  .action(async (options: LookupOptions) => {
     if (!options.latitude || !options.longitude) {
       console.error('Error: Both --latitude and --longitude are required');
       process.exit(1);
@@ -56,7 +57,7 @@ program
   .description('Look up multiple school districts from a JSON file')
   .option('-f, --file <path>', 'Path to JSON file with coordinates array')
   .option('--host <string>', 'API host', `http://localhost:${config.port}`)
-  .action(async (options: any) => {
+  .action(async (options: BatchOptions) => {
     if (!options.file) {
       console.error('Error: --file is required');
       process.exit(1);
@@ -94,10 +95,10 @@ program
 
       console.log(`\nProcessed ${data.count} coordinates:`);
 
-      data.results.forEach((result: any) => {
+      data.results.forEach((result: BatchResult) => {
         if (result.status) {
           console.log(
-            `  [${result.index}] ✓ ${result.districtName} (${result.districtId}) - ${result.coordinates.lat}, ${result.coordinates.lng}`
+            `  [${result.index}] ✓ ${result.districtName} (${result.districtId}) - ${result.coordinates?.lat || 'N/A'}, ${result.coordinates?.lng || 'N/A'}`
           );
         } else {
           console.log(
@@ -106,7 +107,7 @@ program
         }
       });
 
-      const successful = data.results.filter((r: any) => r.status).length;
+      const successful = data.results.filter((r: BatchResult) => r.status).length;
       console.log(`\nSummary: ${successful}/${data.count} successful lookups`);
     } catch (error) {
       console.error('Error:', error);
@@ -118,7 +119,7 @@ program
   .command('test')
   .description('Run a quick test with sample coordinates')
   .option('--host <string>', 'API host', `http://localhost:${config.port}`)
-  .action(async (options: any) => {
+  .action(async (options: TestOptions) => {
     console.log('Running test with sample US coordinates...\n');
 
     const testCoordinates = [
@@ -151,7 +152,7 @@ program
   .command('health')
   .description('Check if the API is running')
   .option('--host <string>', 'API host', `http://localhost:${config.port}`)
-  .action(async (options: any) => {
+  .action(async (options: HealthOptions) => {
     try {
       console.log(`Checking API health at: ${options.host}`);
       const response = await fetch(`${options.host}/health`);

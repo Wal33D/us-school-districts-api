@@ -28,12 +28,18 @@ import { point, booleanPointInPolygon, bbox as turfBbox, simplify } from '@turf/
 import * as net from 'net';
 
 import type { Feature, Polygon, MultiPolygon } from 'geojson';
-import type { SchoolDistrictLookupResult, SchoolDistrictFeatureProperties } from './types';
-import { LRUCache } from './utils/LRUCache';
+import type {
+  SchoolDistrictLookupResult,
+  SchoolDistrictFeatureProperties,
+  DistrictMetadata,
+  IndexedDistrict,
+  DistrictProperties,
+} from './types';
 import { config } from './config';
 import { helmetMiddleware, rateLimitMiddleware, corsMiddleware } from './middleware/security';
 import { logger } from './utils/logger';
-// import { errorHandler } from './middleware/errorHandler'; // Unused
+import { errorHandler } from './middleware/errorHandler';
+import { LRUCache } from './utils/LRUCache';
 
 // -----------------------------------------------------------------------------
 // Configuration
@@ -41,9 +47,6 @@ import { logger } from './utils/logger';
 
 const PORT = config.port;
 const SCHOOLS_DIR = path.join(__dirname, '../school_district_data');
-const CACHE_SIZE = 100; // Only cache 100 most recently used districts
-
-const geometryCache = new LRUCache<Polygon | MultiPolygon>(CACHE_SIZE);
 
 const app = express();
 
@@ -66,7 +69,7 @@ app.use(rateLimitMiddleware);
 app.use(express.json());
 
 // Track connections
-app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((_req: express.Request, res: express.Response, next: express.NextFunction) => {
   const socket = (res as unknown as { connection?: net.Socket }).connection;
   if (socket) {
     connections.add(socket);
@@ -251,7 +254,7 @@ async function ensureLatestData() {
   const dbfPath = path.join(SCHOOLS_DIR, dbf);
   if ((await fileExists(shpPath)) && (await fileExists(dbfPath))) return { shpPath, dbfPath };
 
-  console.info('[DATA] Local shapefile not found – downloading…');
+  logger.info('[DATA] Local shapefile not found – downloading…');
   const zipPath = path.join(SCHOOLS_DIR, `${filePrefix}.zip`);
   await download(zipUrl, zipPath);
   await extract(zipPath, [shp, dbf]);
@@ -263,22 +266,36 @@ async function ensureLatestData() {
 // Spatial index – R‑tree storing bounding box + district meta.
 // -----------------------------------------------------------------------------
 
-type DistrictMetadata = {
-  districtId: string;
-  name: string;
-  recordIndex: number;
-};
-
-type IndexedDistrict = {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-  metadata: DistrictMetadata;
-};
-
 let spatialIndex: Rbush<IndexedDistrict> | null = null;
 let shapefilePaths: { shpPath: string; dbfPath: string } | null = null;
+// Store additional district properties separately to keep spatial index lean
+const districtPropertiesMap = new Map<string, DistrictProperties>();
+
+// Small geometry cache for frequently accessed districts (configurable size)
+const geometryCache = new LRUCache<Polygon | MultiPolygon>(config.cache.geometryCacheSize);
+
+// Helper to format grade levels for display
+function formatGradeLevel(grade: string | null | undefined): string | null {
+  if (!grade) return null;
+
+  // Special grade codes
+  const gradeMap: Record<string, string> = {
+    PK: 'Pre-K',
+    KG: 'K',
+    UG: 'Ungraded',
+  };
+
+  if (gradeMap[grade]) return gradeMap[grade];
+
+  // Remove leading zeros from numeric grades
+  const num = parseInt(grade, 10);
+  if (!isNaN(num)) return num.toString();
+
+  return grade;
+}
+
+// Convert square meters to square miles
+const SQMETERS_TO_SQMILES = 2589988.11;
 
 async function buildSpatialIndex(shpPath: string, dbfPath: string) {
   const index = new Rbush<IndexedDistrict>();
@@ -297,12 +314,28 @@ async function buildSpatialIndex(shpPath: string, dbfPath: string) {
       (feat.geometry.type === 'Polygon' || feat.geometry.type === 'MultiPolygon')
     ) {
       const [minX, minY, maxX, maxY] = turfBbox(feat.geometry);
+      const districtId = feat.properties?.GEOID;
+
       const metadata: DistrictMetadata = {
-        districtId: feat.properties?.GEOID,
+        districtId: districtId,
         name: feat.properties?.NAME,
         recordIndex: recordIndex,
       };
       index.insert({ minX, minY, maxX, maxY, metadata });
+
+      // Store additional properties in the map
+      if (districtId) {
+        const properties: DistrictProperties = {
+          gradeLowest: feat.properties?.LOGRADE || null,
+          gradeHighest: feat.properties?.HIGRADE || null,
+          landAreaSqMeters: feat.properties?.ALAND || 0,
+          waterAreaSqMeters: feat.properties?.AWATER || 0,
+          schoolYear: feat.properties?.SCHOOLYEAR || null,
+          stateCode: feat.properties?.STATEFP || null,
+        };
+        districtPropertiesMap.set(districtId, properties);
+      }
+
       count += 1;
     }
     recordIndex++;
@@ -310,23 +343,31 @@ async function buildSpatialIndex(shpPath: string, dbfPath: string) {
   }
   spatialIndex = index;
   logger.info(
-    `[CACHE] Indexed ${count} districts (bbox only) → R‑tree size: ${index.all().length}`
+    `[INDEX] Indexed ${count} districts → R‑tree size: ${index.all().length}, Properties stored: ${districtPropertiesMap.size}`
   );
   const mem = process.memoryUsage();
-  console.info(`[MEM] Heap used ${(mem.heapUsed / 1024 / 1024).toFixed(1)} MB`);
+  logger.info(`[MEM] Heap used ${(mem.heapUsed / 1024 / 1024).toFixed(1)} MB`);
 }
 
 // -----------------------------------------------------------------------------
 // On-demand geometry loading
 // -----------------------------------------------------------------------------
 
-async function loadDistrictGeometry(recordIndex: number): Promise<Polygon | MultiPolygon | null> {
-  const cacheKey = `geometry_${recordIndex}`;
-  const cached = geometryCache.get(cacheKey);
-  if (cached) return cached;
+async function loadDistrictGeometry(
+  recordIndex: number,
+  districtId?: string
+): Promise<Polygon | MultiPolygon | null> {
+  // Check cache first if we have a district ID
+  if (districtId && config.cache.geometryCacheSize > 0) {
+    const cached = geometryCache.get(districtId);
+    if (cached) {
+      logger.debug(`[CACHE] Geometry hit for district ${districtId}`);
+      return cached;
+    }
+  }
 
   if (!shapefilePaths) {
-    console.error('[GEOMETRY] Shapefile paths not available');
+    logger.error('[GEOMETRY] Shapefile paths not available');
     return null;
   }
 
@@ -342,10 +383,19 @@ async function loadDistrictGeometry(recordIndex: number): Promise<Polygon | Mult
   if (!result.done && result.value?.geometry) {
     // Simplify geometry to reduce memory usage
     const geom = result.value.geometry as Polygon | MultiPolygon;
-    const simplified = simplify(geom, { tolerance: 0.001, highQuality: false }) as
-      | Polygon
-      | MultiPolygon;
-    geometryCache.set(cacheKey, simplified);
+    const simplified = simplify(geom, {
+      tolerance: config.geometry.simplificationTolerance,
+      highQuality: false,
+    }) as Polygon | MultiPolygon;
+
+    // Cache the geometry if caching is enabled
+    if (districtId && config.cache.geometryCacheSize > 0) {
+      geometryCache.set(districtId, simplified);
+      logger.debug(
+        `[CACHE] Stored geometry for district ${districtId}, cache size: ${geometryCache.size()}`
+      );
+    }
+
     return simplified;
   }
 
@@ -358,7 +408,7 @@ async function loadDistrictGeometry(recordIndex: number): Promise<Polygon | Mult
 
 async function lookupSchoolDistrict(lat: number, lng: number): Promise<SchoolDistrictLookupResult> {
   if (!spatialIndex) {
-    console.error('[LOOKUP] Spatial index not ready');
+    logger.error('[LOOKUP] Spatial index not ready');
     return { status: false, districtId: null, districtName: null };
   }
 
@@ -366,14 +416,45 @@ async function lookupSchoolDistrict(lat: number, lng: number): Promise<SchoolDis
   const pt = point([lng, lat]);
 
   for (const c of candidates) {
-    // Load geometry on-demand
-    const geometry = await loadDistrictGeometry(c.metadata.recordIndex);
+    // Load geometry on-demand (pass districtId for caching)
+    const geometry = await loadDistrictGeometry(c.metadata.recordIndex, c.metadata.districtId);
     if (geometry && booleanPointInPolygon(pt, geometry)) {
-      return {
+      const districtId = c.metadata.districtId;
+      const properties = districtPropertiesMap.get(districtId);
+
+      const result: SchoolDistrictLookupResult = {
         status: true,
-        districtId: c.metadata.districtId,
+        districtId: districtId,
         districtName: c.metadata.name,
       };
+
+      // Add priority fields if properties exist
+      if (properties) {
+        const lowestGrade = formatGradeLevel(properties.gradeLowest);
+        const highestGrade = formatGradeLevel(properties.gradeHighest);
+
+        if (lowestGrade && highestGrade) {
+          result.gradeRange = {
+            lowest: lowestGrade,
+            highest: highestGrade,
+          };
+        }
+
+        result.area = {
+          landSqMiles: properties.landAreaSqMeters / SQMETERS_TO_SQMILES,
+          waterSqMiles: properties.waterAreaSqMeters / SQMETERS_TO_SQMILES,
+        };
+
+        if (properties.schoolYear) {
+          result.schoolYear = properties.schoolYear;
+        }
+
+        if (properties.stateCode) {
+          result.stateCode = properties.stateCode;
+        }
+      }
+
+      return result;
     }
   }
   return { status: false, districtId: null, districtName: null };
@@ -382,6 +463,71 @@ async function lookupSchoolDistrict(lat: number, lng: number): Promise<SchoolDis
 // -----------------------------------------------------------------------------
 // Routes
 // -----------------------------------------------------------------------------
+
+// Single coordinate lookup endpoint (POST /lookup) - for API compatibility
+app.post('/lookup', async (req: Request, res: express.Response): Promise<void> => {
+  // Set caching headers - cache for 7 days since school districts rarely change
+  res.set({
+    'Cache-Control': 'public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000',
+    Vary: 'Accept-Encoding',
+    'X-Content-Type-Options': 'nosniff',
+  });
+
+  // Validate request body
+  if (!req.body || typeof req.body !== 'object') {
+    res.status(400).json({
+      status: false,
+      error: 'Request body must be a JSON object with lat and lng properties',
+      districtId: null,
+      districtName: null,
+    });
+    return;
+  }
+
+  const { lat: latInput, lng: lngInput, latitude, longitude, lon } = req.body;
+
+  // Support multiple coordinate field names
+  const lat = Number(latInput || latitude);
+  const lng = Number(lngInput || longitude || lon);
+
+  // Validate input
+  if (Number.isNaN(lat) || Number.isNaN(lng)) {
+    res.status(400).json({
+      status: false,
+      error: 'Invalid coordinates: lat and lng must be numbers',
+      districtId: null,
+      districtName: null,
+    });
+    return;
+  }
+
+  // Validate lat/lng bounds for US territories
+  if (lat < 18 || lat > 72) {
+    res.status(400).json({
+      status: false,
+      error: 'Latitude out of bounds for US territories (18 to 72)',
+      districtId: null,
+      districtName: null,
+    });
+    return;
+  }
+
+  if (lng < -180 || lng > -65) {
+    res.status(400).json({
+      status: false,
+      error: 'Longitude out of bounds for US territories (-180 to -65)',
+      districtId: null,
+      districtName: null,
+    });
+    return;
+  }
+
+  const result = await lookupSchoolDistrict(lat, lng);
+  res.json({
+    ...result,
+    coordinates: { lat, lng },
+  });
+});
 
 // Batch lookup endpoint
 app.post('/school-districts/batch', async (req: Request, res: express.Response): Promise<void> => {
@@ -407,9 +553,9 @@ app.post('/school-districts/batch', async (req: Request, res: express.Response):
     return;
   }
 
-  if (req.body.length > 100) {
+  if (req.body.length > config.api.maxBatchSize) {
     res.status(400).json({
-      error: 'Maximum 100 coordinates allowed per batch request',
+      error: `Maximum ${config.api.maxBatchSize} coordinates allowed per batch request`,
     });
     return;
   }
@@ -545,12 +691,14 @@ app.get('/school-district', async (req: Request, res: express.Response): Promise
   }
 
   const result = await lookupSchoolDistrict(lat, lng);
-  console.log({ input: { lat, lng }, output: result });
   res.json({
     ...result,
     coordinates: { lat, lng },
   });
 });
+
+// Error handling middleware - must be last
+app.use(errorHandler);
 
 // -----------------------------------------------------------------------------
 // Bootstrap
@@ -562,11 +710,14 @@ let server: net.Server | undefined;
   try {
     const { shpPath, dbfPath } = await ensureLatestData();
     await buildSpatialIndex(shpPath, dbfPath);
-    server = app.listen(PORT, () =>
-      logger.info(`[READY] us-school-districts-service listening on localhost:${PORT}`)
-    );
+    server = app.listen(PORT, () => {
+      logger.info(`[READY] us-school-districts-service listening on localhost:${PORT}`);
+      logger.info(
+        `[CONFIG] Max batch size: ${config.api.maxBatchSize}, Geometry cache size: ${config.cache.geometryCacheSize}`
+      );
+    });
   } catch (err) {
-    console.error('[BOOT] Failed to start server:', err);
+    logger.error('[BOOT] Failed to start server:', err);
     process.exit(1);
   }
 })();
@@ -579,26 +730,26 @@ let isShuttingDown = false;
 
 async function shutdown(signal: string) {
   if (isShuttingDown) {
-    console.info(`[SHUTDOWN] Already shutting down...`);
+    logger.info(`[SHUTDOWN] Already shutting down...`);
     return;
   }
 
   isShuttingDown = true;
-  console.info(`\n[SHUTDOWN] Caught ${signal}. Starting graceful shutdown...`);
+  logger.info(`[SHUTDOWN] Caught ${signal}. Starting graceful shutdown...`);
 
   // Stop accepting new connections
   if (server) {
     server.close((err: Error | undefined) => {
       if (err) {
-        console.error('[SHUTDOWN] Error closing server:', err);
+        logger.error('[SHUTDOWN] Error closing server:', err);
         process.exit(1);
       }
-      console.info('[SHUTDOWN] Server closed successfully');
+      logger.info('[SHUTDOWN] Server closed successfully');
       process.exit(0);
     });
 
     // Close all active connections
-    console.info(`[SHUTDOWN] Closing ${connections.size} active connections...`);
+    logger.info(`[SHUTDOWN] Closing ${connections.size} active connections...`);
     connections.forEach(connection => {
       connection.end();
     });
@@ -612,7 +763,7 @@ async function shutdown(signal: string) {
 
     // Force shutdown after 30 seconds
     setTimeout(() => {
-      console.error('[SHUTDOWN] Could not close connections in time, forcefully shutting down');
+      logger.error('[SHUTDOWN] Could not close connections in time, forcefully shutting down');
       process.exit(1);
     }, 30000);
   } else {
@@ -625,11 +776,11 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 // Handle uncaught errors
 process.on('uncaughtException', err => {
-  console.error('[ERROR] Uncaught exception:', err);
+  logger.error('[ERROR] Uncaught exception:', err);
   shutdown('UNCAUGHT_EXCEPTION');
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('[ERROR] Unhandled rejection at:', promise, 'reason:', reason);
+  logger.error('[ERROR] Unhandled rejection at:', promise, 'reason:', reason);
   shutdown('UNHANDLED_REJECTION');
 });

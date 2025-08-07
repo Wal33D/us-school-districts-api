@@ -63,7 +63,7 @@ describe('Helper Functions', () => {
 
     afterEach(async () => {
       try {
-        await fs.rmdir(testDir, { recursive: true });
+        await fs.rm(testDir, { recursive: true, force: true });
       } catch (_error) {
         // Directory might not exist
       }

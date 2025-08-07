@@ -78,6 +78,7 @@
     "helmet": "^8.1.0",
     "joi": "^17.13.3",
     "node-fetch": "2.7.0",
+    "rbush": "^3.0.1",
     "shapefile": "^0.6.6",
     "unzipper": "^0.12.3",
     "winston": "^3.17.0"
@@ -88,7 +89,6 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^20.4.0",
     "@types/node-fetch": "^2.6.12",
-    "@types/rbush": "^4.0.0",
     "@types/shapefile": "^0.6.4",
     "@types/supertest": "^6.0.3",
     "@types/unzipper": "^0.10.11",

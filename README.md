@@ -24,14 +24,29 @@ npm run build && npm start
 
 ## Configuration
 
-Required environment variables:
+Environment variables (see `.env.example` for full documentation):
 
-| Variable      | Description                 | Example         |
+### Core Settings
+| Variable      | Description                 | Default         |
 | ------------- | --------------------------- | --------------- |
 | `PORT`        | Service port                | `3712`          |
-| `ALLOWED_IPS` | Comma-separated allowed IPs | `::1,127.0.0.1` |
-| `CACHE_SIZE`  | LRU cache size              | `100`           |
-| `NODE_ENV`    | Environment mode            | `production`    |
+| `NODE_ENV`    | Environment mode            | `development`   |
+| `LOG_LEVEL`   | Logging level (error/warn/info/debug) | `info` |
+
+### Performance Tuning
+| Variable      | Description                 | Default         |
+| ------------- | --------------------------- | --------------- |
+| `GEOMETRY_SIMPLIFICATION_TOLERANCE` | Boundary accuracy (decimal degrees) | `0.001` |
+| `MAX_BATCH_SIZE` | Max coordinates per batch request | `50` |
+| `GEOMETRY_CACHE_SIZE` | Number of districts to cache | `10` |
+
+### Security (Optional)
+| Variable      | Description                 | Default         |
+| ------------- | --------------------------- | --------------- |
+| `ENABLE_SECURITY_MIDDLEWARE` | Enable helmet/CORS/rate limiting | `false` |
+| `RATE_LIMIT_WINDOW_MS` | Rate limit time window | `60000` |
+| `RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `100` |
+| `CORS_ALLOWED_ORIGINS` | Allowed CORS origins | `*` |
 
 ## API Reference
 

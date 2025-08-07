@@ -1,11 +1,8 @@
 import * as dotenv from 'dotenv';
 import * as Joi from 'joi';
 
-// Suppress dotenv logging by intercepting console.log temporarily
-const originalLog = console.log;
-console.log = () => {};
-dotenv.config();
-console.log = originalLog;
+// Load environment variables silently
+dotenv.config({ debug: false });
 
 // Define validation schema
 const envSchema = Joi.object({
@@ -26,6 +23,15 @@ const envSchema = Joi.object({
 
   // Logging
   LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'debug').default('info'),
+
+  // Geometry Processing
+  GEOMETRY_SIMPLIFICATION_TOLERANCE: Joi.number().default(0.001),
+
+  // API Limits
+  MAX_BATCH_SIZE: Joi.number().min(1).max(100).default(50),
+
+  // Caching
+  GEOMETRY_CACHE_SIZE: Joi.number().min(0).max(100).default(10),
 }).unknown();
 
 // Validate environment variables
@@ -61,5 +67,17 @@ export const config = {
 
   logging: {
     level: envVars.LOG_LEVEL as string,
+  },
+
+  geometry: {
+    simplificationTolerance: envVars.GEOMETRY_SIMPLIFICATION_TOLERANCE as number,
+  },
+
+  api: {
+    maxBatchSize: envVars.MAX_BATCH_SIZE as number,
+  },
+
+  cache: {
+    geometryCacheSize: envVars.GEOMETRY_CACHE_SIZE as number,
   },
 };

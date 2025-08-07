@@ -1,3 +1,7 @@
+/**
+ * Simple LRU Cache implementation for geometry caching
+ * Keeps most recently used items, evicts least recently used when full
+ */
 export class LRUCache<T> {
   private maxSize: number;
   private cache: Map<string, T>;
@@ -9,6 +13,8 @@ export class LRUCache<T> {
 
   get(key: string): T | undefined {
     if (!this.cache.has(key)) return undefined;
+
+    // Move to end (most recently used)
     const value = this.cache.get(key)!;
     this.cache.delete(key);
     this.cache.set(key, value);
@@ -16,9 +22,11 @@ export class LRUCache<T> {
   }
 
   set(key: string, value: T): void {
+    // Remove if exists (to reorder)
     if (this.cache.has(key)) {
       this.cache.delete(key);
     } else if (this.cache.size >= this.maxSize) {
+      // Remove least recently used (first item)
       const firstKey = this.cache.keys().next().value;
       if (firstKey !== undefined) {
         this.cache.delete(firstKey);
