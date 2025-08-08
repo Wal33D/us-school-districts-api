@@ -1,8 +1,14 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "rootDir": "."
-  },
-  "include": ["src/**/*", "__tests__/**/*", "**/*.test.ts", "**/*.spec.ts"],
+  "include": [
+    "src/**/*",
+    "__tests__/**/*",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "jest.config.js",
+    "ecosystem.config.js",
+    "eslint.config.cjs",
+    ".prettierrc.js"
+  ],
   "exclude": ["node_modules", "dist"]
 }
