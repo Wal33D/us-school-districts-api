@@ -8,7 +8,7 @@
   },
   "esModuleInterop": true,
   "scripts": {
-    "dev": "nodemon --watch src --ext ts,tsx --exec ts-node src/server.ts",
+    "dev": "nodemon",
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "jest",
