@@ -706,21 +706,47 @@ app.use(errorHandler);
 
 let server: net.Server | undefined;
 
-(async () => {
+async function startServer() {
   try {
     const { shpPath, dbfPath } = await ensureLatestData();
     await buildSpatialIndex(shpPath, dbfPath);
-    server = app.listen(PORT, () => {
-      logger.info(`[READY] us-school-districts-service listening on localhost:${PORT}`);
+
+    server = app.listen(PORT, '0.0.0.0', () => {
+      logger.info(`[READY] us-school-districts-service listening on 0.0.0.0:${PORT}`);
       logger.info(
         `[CONFIG] Max batch size: ${config.api.maxBatchSize}, Geometry cache size: ${config.cache.geometryCacheSize}`
       );
     });
+
+    // Track active connections on the server
+    server.on('connection', (socket: net.Socket) => {
+      connections.add(socket);
+      socket.on('close', () => {
+        connections.delete(socket);
+      });
+    });
+
+    // Keep the server reference to prevent garbage collection
+    server.ref();
   } catch (err) {
     logger.error('[BOOT] Failed to start server:', err);
     process.exit(1);
   }
-})();
+}
+
+// Start the server
+startServer().catch(err => {
+  logger.error('[BOOT] Unhandled error during startup:', err);
+  process.exit(1);
+});
+
+// Keep the process alive
+setInterval(
+  () => {
+    // Keep-alive interval to prevent process from exiting
+  },
+  1000 * 60 * 60
+); // 1 hour
 
 // -----------------------------------------------------------------------------
 // Graceful shutdown
