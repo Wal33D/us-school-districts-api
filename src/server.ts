@@ -24,7 +24,14 @@ import express, { Request } from 'express';
 import compression from 'compression';
 import { localOnlyMiddleware } from './middleware/localOnlyMiddleware';
 import { createWriteStream, rmSync } from 'fs';
-import { point, booleanPointInPolygon, bbox as turfBbox, simplify } from '@turf/turf';
+import {
+  point,
+  booleanPointInPolygon,
+  bbox as turfBbox,
+  simplify,
+  buffer,
+  pointToPolygonDistance,
+} from '@turf/turf';
 import * as net from 'net';
 
 import type { Feature, Polygon, MultiPolygon } from 'geojson';
@@ -412,8 +419,10 @@ async function lookupSchoolDistrict(lat: number, lng: number): Promise<SchoolDis
     return { status: false, districtId: null, districtName: null };
   }
 
-  const candidates = spatialIndex.search({ minX: lng, minY: lat, maxX: lng, maxY: lat });
   const pt = point([lng, lat]);
+
+  // First, search for exact match with original point
+  const candidates = spatialIndex.search({ minX: lng, minY: lat, maxX: lng, maxY: lat });
 
   for (const c of candidates) {
     // Load geometry on-demand (pass districtId for caching)
@@ -457,6 +466,124 @@ async function lookupSchoolDistrict(lat: number, lng: number): Promise<SchoolDis
       return result;
     }
   }
+
+  // If no exact match found, try with a small buffer (for edge cases near water/boundaries)
+  // Search in a slightly larger area (about 500 meters)
+  const bufferDegrees = 0.005; // Approximately 500 meters
+  const expandedCandidates = spatialIndex.search({
+    minX: lng - bufferDegrees,
+    minY: lat - bufferDegrees,
+    maxX: lng + bufferDegrees,
+    maxY: lat + bufferDegrees,
+  });
+
+  // Track nearest district in case we need a fallback
+  let nearestDistrict: { district: IndexedDistrict; distance: number } | null = null;
+
+  for (const c of expandedCandidates) {
+    const geometry = await loadDistrictGeometry(c.metadata.recordIndex, c.metadata.districtId);
+    if (!geometry) continue;
+
+    // Check if point is within a buffered version of the geometry (150 meter buffer)
+    try {
+      const bufferedGeometry = buffer(geometry, 0.0015, { units: 'degrees' }); // ~150 meters
+      if (bufferedGeometry && booleanPointInPolygon(pt, bufferedGeometry)) {
+        const districtId = c.metadata.districtId;
+        const properties = districtPropertiesMap.get(districtId);
+
+        const result: SchoolDistrictLookupResult = {
+          status: true,
+          districtId: districtId,
+          districtName: c.metadata.name,
+        };
+
+        // Add priority fields if properties exist
+        if (properties) {
+          const lowestGrade = formatGradeLevel(properties.gradeLowest);
+          const highestGrade = formatGradeLevel(properties.gradeHighest);
+
+          if (lowestGrade && highestGrade) {
+            result.gradeRange = {
+              lowest: lowestGrade,
+              highest: highestGrade,
+            };
+          }
+
+          result.area = {
+            landSqMiles: properties.landAreaSqMeters / SQMETERS_TO_SQMILES,
+            waterSqMiles: properties.waterAreaSqMeters / SQMETERS_TO_SQMILES,
+          };
+
+          if (properties.schoolYear) {
+            result.schoolYear = properties.schoolYear;
+          }
+
+          if (properties.stateCode) {
+            result.stateCode = properties.stateCode;
+          }
+        }
+
+        logger.debug(`[LOOKUP] Found district using buffer for point (${lat}, ${lng})`);
+        return result;
+      }
+
+      // Calculate distance to this district for potential fallback
+      const dist = Math.abs(pointToPolygonDistance(pt, geometry, { units: 'meters' }));
+      if (!nearestDistrict || dist < nearestDistrict.distance) {
+        nearestDistrict = { district: c, distance: dist };
+      }
+    } catch (error) {
+      logger.debug(
+        `[LOOKUP] Buffer calculation failed for district ${c.metadata.districtId}:`,
+        error
+      );
+    }
+  }
+
+  // As a last resort, if we found a very close district (within 500 meters), use it
+  if (nearestDistrict && nearestDistrict.distance < 500) {
+    const c = nearestDistrict.district;
+    const districtId = c.metadata.districtId;
+    const properties = districtPropertiesMap.get(districtId);
+
+    const result: SchoolDistrictLookupResult = {
+      status: true,
+      districtId: districtId,
+      districtName: c.metadata.name,
+    };
+
+    // Add priority fields if properties exist
+    if (properties) {
+      const lowestGrade = formatGradeLevel(properties.gradeLowest);
+      const highestGrade = formatGradeLevel(properties.gradeHighest);
+
+      if (lowestGrade && highestGrade) {
+        result.gradeRange = {
+          lowest: lowestGrade,
+          highest: highestGrade,
+        };
+      }
+
+      result.area = {
+        landSqMiles: properties.landAreaSqMeters / SQMETERS_TO_SQMILES,
+        waterSqMiles: properties.waterAreaSqMeters / SQMETERS_TO_SQMILES,
+      };
+
+      if (properties.schoolYear) {
+        result.schoolYear = properties.schoolYear;
+      }
+
+      if (properties.stateCode) {
+        result.stateCode = properties.stateCode;
+      }
+    }
+
+    logger.debug(
+      `[LOOKUP] Using nearest district (${nearestDistrict.distance.toFixed(0)}m away) for point (${lat}, ${lng})`
+    );
+    return result;
+  }
+
   return { status: false, districtId: null, districtName: null };
 }
 
