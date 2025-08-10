@@ -468,8 +468,8 @@ async function lookupSchoolDistrict(lat: number, lng: number): Promise<SchoolDis
   }
 
   // If no exact match found, try with a small buffer (for edge cases near water/boundaries)
-  // Search in a slightly larger area (about 500 meters)
-  const bufferDegrees = 0.005; // Approximately 500 meters
+  // Search in a larger area to find nearby districts (about 10km)
+  const bufferDegrees = 0.1; // Approximately 10km - wide search to ensure we find nearest
   const expandedCandidates = spatialIndex.search({
     minX: lng - bufferDegrees,
     minY: lat - bufferDegrees,
@@ -477,7 +477,7 @@ async function lookupSchoolDistrict(lat: number, lng: number): Promise<SchoolDis
     maxY: lat + bufferDegrees,
   });
 
-  // Track nearest district in case we need a fallback
+  // Track nearest district - we'll always use this if no exact match is found
   let nearestDistrict: { district: IndexedDistrict; distance: number } | null = null;
 
   for (const c of expandedCandidates) {
@@ -540,8 +540,9 @@ async function lookupSchoolDistrict(lat: number, lng: number): Promise<SchoolDis
     }
   }
 
-  // As a last resort, if we found a very close district (within 500 meters), use it
-  if (nearestDistrict && nearestDistrict.distance < 500) {
+  // Always return the nearest district if we found one (even if far away)
+  // This ensures every property gets assigned to a school district
+  if (nearestDistrict) {
     const c = nearestDistrict.district;
     const districtId = c.metadata.districtId;
     const properties = districtPropertiesMap.get(districtId);
@@ -550,6 +551,8 @@ async function lookupSchoolDistrict(lat: number, lng: number): Promise<SchoolDis
       status: true,
       districtId: districtId,
       districtName: c.metadata.name,
+      isApproximate: true,
+      approximateDistance: nearestDistrict.distance,
     };
 
     // Add priority fields if properties exist
@@ -578,12 +581,82 @@ async function lookupSchoolDistrict(lat: number, lng: number): Promise<SchoolDis
       }
     }
 
-    logger.debug(
-      `[LOOKUP] Using nearest district (${nearestDistrict.distance.toFixed(0)}m away) for point (${lat}, ${lng})`
+    logger.info(
+      `[LOOKUP] Using nearest district (${nearestDistrict.distance.toFixed(0)}m away) as approximation for point (${lat}, ${lng})`
     );
     return result;
   }
 
+  // This should rarely happen unless there are no districts in the search area
+  // In that case, expand the search even further
+  logger.warn(
+    `[LOOKUP] No district found within 10km for point (${lat}, ${lng}). Expanding search...`
+  );
+
+  // Do a full search of all districts to find the absolute nearest
+  const allCandidates = spatialIndex.all();
+  let absoluteNearest: { district: IndexedDistrict; distance: number } | null = null;
+
+  for (const c of allCandidates) {
+    const geometry = await loadDistrictGeometry(c.metadata.recordIndex, c.metadata.districtId);
+    if (!geometry) continue;
+
+    try {
+      const dist = Math.abs(pointToPolygonDistance(pt, geometry, { units: 'meters' }));
+      if (!absoluteNearest || dist < absoluteNearest.distance) {
+        absoluteNearest = { district: c, distance: dist };
+      }
+    } catch (_error) {
+      logger.debug(`[LOOKUP] Distance calculation failed for district ${c.metadata.districtId}`);
+    }
+  }
+
+  if (absoluteNearest) {
+    const c = absoluteNearest.district;
+    const districtId = c.metadata.districtId;
+    const properties = districtPropertiesMap.get(districtId);
+
+    const result: SchoolDistrictLookupResult = {
+      status: true,
+      districtId: districtId,
+      districtName: c.metadata.name,
+      isApproximate: true,
+      approximateDistance: absoluteNearest.distance,
+    };
+
+    // Add priority fields if properties exist
+    if (properties) {
+      const lowestGrade = formatGradeLevel(properties.gradeLowest);
+      const highestGrade = formatGradeLevel(properties.gradeHighest);
+
+      if (lowestGrade && highestGrade) {
+        result.gradeRange = {
+          lowest: lowestGrade,
+          highest: highestGrade,
+        };
+      }
+
+      result.area = {
+        landSqMiles: properties.landAreaSqMeters / SQMETERS_TO_SQMILES,
+        waterSqMiles: properties.waterAreaSqMeters / SQMETERS_TO_SQMILES,
+      };
+
+      if (properties.schoolYear) {
+        result.schoolYear = properties.schoolYear;
+      }
+
+      if (properties.stateCode) {
+        result.stateCode = properties.stateCode;
+      }
+    }
+
+    logger.warn(
+      `[LOOKUP] Using absolute nearest district (${absoluteNearest.distance.toFixed(0)}m away) for point (${lat}, ${lng})`
+    );
+    return result;
+  }
+
+  // Should never reach here unless there are no districts at all
   return { status: false, districtId: null, districtName: null };
 }
 

@@ -22,6 +22,10 @@ export interface SchoolDistrictLookupResult {
   };
   schoolYear?: string;
   stateCode?: string;
+  // Indicates if this is an approximation (nearest district)
+  isApproximate?: boolean;
+  // Distance to the district boundary in meters (when approximate)
+  approximateDistance?: number;
 }
 
 export interface SchoolDistrictLookupResultWithCoordinates extends SchoolDistrictLookupResult {
