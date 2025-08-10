@@ -31,12 +31,6 @@ module.exports = {
       kill_timeout: 5000,
       listen_timeout: 3000,
       
-      node_args: [
-        '--max-old-space-size=96',
-        '--optimize-for-size',
-        '--gc-interval=100',
-      ].join(' '),
-      
       cron_restart: '0 3 * * *',
       wait_ready: true,
       post_update: ['npm install', 'npm run build'],
