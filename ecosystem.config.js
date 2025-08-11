@@ -4,7 +4,7 @@ module.exports = {
       name: 'us-school-districts-api',
       script: 'dist/server.js',
       exec_mode: 'fork',
-      max_memory_restart: '200M',
+      max_memory_restart: '400M',
       autorestart: true,
       watch: false,
       max_restarts: 10,
