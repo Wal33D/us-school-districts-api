@@ -911,8 +911,8 @@ async function startServer() {
     const { shpPath, dbfPath } = await ensureLatestData();
     await buildSpatialIndex(shpPath, dbfPath);
 
-    server = app.listen(PORT, '0.0.0.0', () => {
-      logger.info(`[READY] us-school-districts-service listening on 0.0.0.0:${PORT}`);
+    server = app.listen(PORT, () => {
+      logger.info(`[READY] us-school-districts-service listening on port ${PORT}`);
       logger.info(
         `[CONFIG] Max batch size: ${config.api.maxBatchSize}, Geometry cache size: ${config.cache.geometryCacheSize}`
       );
