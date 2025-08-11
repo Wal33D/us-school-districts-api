@@ -1,8 +1,8 @@
 import * as dotenv from 'dotenv';
 import * as Joi from 'joi';
 
-// Load environment variables silently
-dotenv.config({ debug: false });
+// Load environment variables
+dotenv.config();
 
 // Define validation schema
 const envSchema = Joi.object({
