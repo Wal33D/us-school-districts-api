@@ -31,11 +31,42 @@ import type { Feature, Polygon, MultiPolygon } from 'geojson';
 
 // Database path
 const DB_PATH = path.join(__dirname, '../school_district_data/districts.db');
+const SHAPEFILE_PATH = path.join(
+  __dirname,
+  '../school_district_data/EDGE_SCHOOLDISTRICT_TL24_SY2324.shp'
+);
 
-// Check database exists
+// Auto-create database if it doesn't exist
 if (!fs.existsSync(DB_PATH)) {
-  logger.error(`Database not found at ${DB_PATH}. Run: npm run setup-db`);
-  process.exit(1);
+  logger.info('Database not found, attempting to create from shapefile...');
+
+  // Check if shapefile exists
+  if (!fs.existsSync(SHAPEFILE_PATH)) {
+    logger.error(`Cannot auto-create database: shapefile not found at ${SHAPEFILE_PATH}`);
+    logger.error('Please ensure shapefile data is included in deployment');
+    process.exit(1);
+  }
+
+  // Try to create the database
+  try {
+    const { execSync } = require('child_process');
+    logger.info('Running setup-db to create database...');
+    execSync('npm run setup-db', {
+      stdio: 'inherit',
+      cwd: path.join(__dirname, '..'),
+    });
+    logger.info('Database created successfully');
+  } catch (error) {
+    logger.error('Failed to auto-create database:', error);
+    logger.error('Please run manually: npm run setup-db');
+    process.exit(1);
+  }
+
+  // Verify it was created
+  if (!fs.existsSync(DB_PATH)) {
+    logger.error('Database creation failed - file not found after setup');
+    process.exit(1);
+  }
 }
 
 // Initialize Express
