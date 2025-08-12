@@ -8,7 +8,7 @@
   },
   "esModuleInterop": true,
   "engines": {
-    "node": ">=22.0.0",
+    "node": ">=20.0.0",
     "npm": ">=10.0.0"
   },
   "scripts": {
@@ -16,6 +16,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "setup-db": "node dist/setup-database.js",
+    "postinstall": "npm rebuild better-sqlite3",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "lint": "eslint 'src/**/*.{ts,tsx}'",

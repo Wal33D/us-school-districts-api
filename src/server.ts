@@ -293,7 +293,8 @@ function lookupDistrict(lat: number, lng: number): LookupResult {
       }
     }
 
-    // Step 3: No exact match - find nearest district
+    // Step 3: No exact match - find nearest district (but only if within reasonable distance)
+    const MAX_DISTANCE_METERS = 50000; // 50km - reasonable distance for US boundaries
     const nearest = stmtNearest.all(lng, lng, lat, lat) as DistrictRow[];
 
     for (const candidate of nearest) {
@@ -305,33 +306,46 @@ function lookupDistrict(lat: number, lng: number): LookupResult {
         // Calculate actual distance
         const dist = pointToPolygonDistance(pt, feature, { units: 'meters' });
 
-        logger.info('Using nearest district', {
-          districtId: candidate.districtId,
-          districtName: candidate.districtName,
-          distance: Math.round(dist),
-          lat,
-          lng,
-        });
+        // Only return nearest if within reasonable distance (50km)
+        if (dist <= MAX_DISTANCE_METERS) {
+          logger.info('Using nearest district', {
+            districtId: candidate.districtId,
+            districtName: candidate.districtName,
+            distance: Math.round(dist),
+            lat,
+            lng,
+          });
 
-        // Return the nearest one (first in list since ordered by distance)
-        return {
-          status: true,
-          districtId: candidate.districtId,
-          districtName: candidate.districtName,
-          gradeRange: {
-            lowest: formatGrade(candidate.grade_lowest),
-            highest: formatGrade(candidate.grade_highest),
-          },
-          area: {
-            landSqMiles: candidate.landSqMiles,
-            waterSqMiles: candidate.waterSqMiles,
-          },
-          schoolYear: candidate.schoolYear,
-          stateCode: candidate.stateCode,
-          isApproximate: true,
-          approximateDistance: Math.round(dist),
-          coordinates: { lat, lng },
-        };
+          // Return the nearest one (first in list since ordered by distance)
+          return {
+            status: true,
+            districtId: candidate.districtId,
+            districtName: candidate.districtName,
+            gradeRange: {
+              lowest: formatGrade(candidate.grade_lowest),
+              highest: formatGrade(candidate.grade_highest),
+            },
+            area: {
+              landSqMiles: candidate.landSqMiles,
+              waterSqMiles: candidate.waterSqMiles,
+            },
+            schoolYear: candidate.schoolYear,
+            stateCode: candidate.stateCode,
+            isApproximate: true,
+            approximateDistance: Math.round(dist),
+            coordinates: { lat, lng },
+          };
+        } else if (candidate === nearest[0]) {
+          // Log when rejecting due to distance
+          logger.info('Nearest district too far away', {
+            districtId: candidate.districtId,
+            districtName: candidate.districtName,
+            distance: Math.round(dist),
+            maxDistance: MAX_DISTANCE_METERS,
+            lat,
+            lng,
+          });
+        }
       } catch (e) {
         logger.error('Error with nearest district', {
           districtId: candidate.districtId,

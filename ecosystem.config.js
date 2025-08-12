@@ -34,6 +34,12 @@ module.exports = {
       cron_restart: '0 3 * * *',
       wait_ready: true,
       post_update: ['npm install', 'npm run build'],
+      
+      // Auto-rebuild native modules on deployment to fix Node version mismatch
+      post_deploy: [
+        'npm rebuild better-sqlite3',
+        'npm run setup-db'
+      ].join(' && '),
     },
   ],
 };
