@@ -30,6 +30,8 @@ jobs:
           path: |
             dist
             ecosystem.config.js
+            startup.sh
+            school_district_data
             package.json
             package-lock.json
 
