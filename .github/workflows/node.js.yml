@@ -30,7 +30,6 @@ jobs:
           path: |
             dist
             ecosystem.config.js
-            startup.sh
             school_district_data
             package.json
             package-lock.json
@@ -75,7 +74,7 @@ jobs:
           key: ${{ secrets.LINODE_SSH_KEY }}
           script: 'ls -la /home/puppeteer-user/candycomp-us-school-districts-api/'
 
-      - name: Install Node Modules on Linode
+      - name: Install Node Modules and Setup Database on Linode
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.LINODE_HOST }}
@@ -84,6 +83,29 @@ jobs:
           script: |
             cd /home/puppeteer-user/candycomp-us-school-districts-api
             npm ci
+            # Rebuild better-sqlite3 for current Node version
+            npm rebuild better-sqlite3 || npm install better-sqlite3
+
+            # Ensure database exists
+            if [ ! -f "school_district_data/districts.db" ]; then
+              echo "Database not found, creating from shapefile..."
+              npm run setup-db
+            fi
+
+            # Verify database exists and is valid
+            if [ -f "school_district_data/districts.db" ]; then
+              DB_SIZE=$(stat -c%s "school_district_data/districts.db" 2>/dev/null)
+              if [ -n "$DB_SIZE" ] && [ "$DB_SIZE" -gt 100000000 ]; then
+                echo "Database verified ($(($DB_SIZE / 1024 / 1024))MB)"
+              else
+                echo "Database seems invalid, recreating..."
+                rm -f school_district_data/districts.db
+                npm run setup-db
+              fi
+            else
+              echo "Failed to create database!"
+              exit 1
+            fi
 
       - name: Start or Reload and Save PM2 Process on Linode
         uses: appleboy/ssh-action@master

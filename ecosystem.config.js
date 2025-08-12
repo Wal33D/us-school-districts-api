@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'us-school-districts-api',
-      script: 'startup.sh',
+      script: 'dist/server.js',
       cwd: '/home/puppeteer-user/candycomp-us-school-districts-api',
       exec_mode: 'fork',
       max_memory_restart: '150M',
