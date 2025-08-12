@@ -79,8 +79,10 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// Apply local-only middleware for actual API endpoints
-app.use(localOnlyMiddleware);
+// Apply local-only middleware for actual API endpoints (unless disabled)
+if (!config.disableLocalOnly) {
+  app.use(localOnlyMiddleware);
+}
 
 // Initialize database connection
 let db: Database.Database;
@@ -362,7 +364,7 @@ app.post('/lookup', (req: Request, res: Response): void => {
     'X-Content-Type-Options': 'nosniff',
   });
 
-  const { lat, lng } = req.body;
+  const { lat, lng } = req.body || {};
 
   if (typeof lat !== 'number' || typeof lng !== 'number') {
     res.status(400).json({
@@ -396,14 +398,24 @@ app.post('/school-districts/batch', (req: Request, res: Response): void => {
     return;
   }
 
-  const results = coordinates.map(coord => {
+  const results = coordinates.map((coord, index) => {
     if (typeof coord.lat === 'number' && typeof coord.lng === 'number') {
-      return lookupDistrict(coord.lat, coord.lng);
+      const result = lookupDistrict(coord.lat, coord.lng);
+      return { ...result, index };
     }
-    return { status: false, districtId: null, districtName: null, error: 'Invalid coordinate' };
+    return {
+      status: false,
+      districtId: null,
+      districtName: null,
+      error: 'Invalid coordinate',
+      index,
+    };
   });
 
-  res.json({ results });
+  res.json({
+    count: results.length,
+    results,
+  });
 });
 
 // Stats endpoint

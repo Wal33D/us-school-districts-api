@@ -83,7 +83,7 @@ program
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(coordinates),
+        body: JSON.stringify({ coordinates }),
       });
 
       const data = await response.json();

@@ -23,6 +23,8 @@ function isRequestFromBypassIP(req: Request): boolean {
 }
 
 // Conditional middleware wrapper
+// Note: Security middleware is disabled by default for local-only deployments
+// where localOnlyMiddleware provides adequate protection
 function conditionalMiddleware(middleware: RequestHandler): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!config.security.enableMiddleware || isRequestFromBypassIP(req)) {

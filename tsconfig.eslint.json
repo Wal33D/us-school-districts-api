@@ -7,8 +7,7 @@
     "**/*.spec.ts",
     "jest.config.js",
     "ecosystem.config.js",
-    "eslint.config.cjs",
-    ".prettierrc.js"
+    "eslint.config.cjs"
   ],
   "exclude": ["node_modules", "dist"]
 }

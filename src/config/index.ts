@@ -9,6 +9,7 @@ const envSchema = Joi.object({
   // Server
   PORT: Joi.number().default(3712),
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
+  DISABLE_LOCAL_ONLY: Joi.boolean().default(false), // Set to true to allow external access
 
   // Security
   ENABLE_SECURITY_MIDDLEWARE: Joi.boolean().default(false),
@@ -23,15 +24,6 @@ const envSchema = Joi.object({
 
   // Logging
   LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'debug').default('info'),
-
-  // Geometry Processing
-  GEOMETRY_SIMPLIFICATION_TOLERANCE: Joi.number().default(0.001),
-
-  // API Limits
-  MAX_BATCH_SIZE: Joi.number().min(1).max(100).default(50),
-
-  // Caching
-  GEOMETRY_CACHE_SIZE: Joi.number().min(0).max(100).default(10),
 }).unknown();
 
 // Validate environment variables
@@ -47,7 +39,7 @@ export const config = {
   nodeEnv: envVars.NODE_ENV as string,
   isProduction: envVars.NODE_ENV === 'production',
   isDevelopment: envVars.NODE_ENV === 'development',
-  isTest: envVars.NODE_ENV === 'test',
+  disableLocalOnly: envVars.DISABLE_LOCAL_ONLY as boolean,
 
   security: {
     enableMiddleware: envVars.ENABLE_SECURITY_MIDDLEWARE as boolean,
@@ -67,17 +59,5 @@ export const config = {
 
   logging: {
     level: envVars.LOG_LEVEL as string,
-  },
-
-  geometry: {
-    simplificationTolerance: envVars.GEOMETRY_SIMPLIFICATION_TOLERANCE as number,
-  },
-
-  api: {
-    maxBatchSize: envVars.MAX_BATCH_SIZE as number,
-  },
-
-  cache: {
-    geometryCacheSize: envVars.GEOMETRY_CACHE_SIZE as number,
   },
 };

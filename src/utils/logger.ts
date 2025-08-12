@@ -97,12 +97,3 @@ if (config.isProduction) {
     })
   );
 }
-
-// Create a stream object for Morgan middleware
-export const stream = {
-  write: (message: string) => {
-    logger.info(message.trim());
-  },
-};
-
-export default logger;

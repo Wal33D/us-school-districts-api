@@ -17,7 +17,6 @@
     "start": "node dist/server.js",
     "setup-db": "node dist/setup-database.js",
     "test": "jest",
-    "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "lint": "eslint 'src/**/*.{ts,tsx}'",
     "lint:fix": "eslint 'src/**/*.{ts,tsx}' --fix",
@@ -25,8 +24,7 @@
     "format:check": "prettier --check 'src/**/*.{ts,tsx,json}'",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist coverage logs",
-    "prepare": "husky install && npm run build || true",
-    "cli": "ts-node src/cli.ts"
+    "cli": "node dist/cli.js"
   },
   "nodemonConfig": {
     "watch": [
@@ -59,36 +57,29 @@
     "express",
     "rest-api"
   ],
-  "lint-staged": {
-    "*.{ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
-    ],
-    "*.{json,md}": [
-      "prettier --write"
-    ]
-  },
   "dependencies": {
     "@turf/turf": "^7.2.0",
-    "@types/compression": "^1.8.1",
     "better-sqlite3": "^11.5.0",
     "commander": "^14.0.0",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.1",
+    "dotenv": "^16.4.5",
     "express": "^5.1.0",
     "express-rate-limit": "^8.0.1",
     "helmet": "^8.1.0",
     "joi": "^17.13.3",
+    "node-fetch": "^2.7.0",
     "shapefile": "^0.6.6",
     "winston": "^3.17.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
+    "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.4.0",
+    "@types/node-fetch": "^2.6.13",
     "@types/shapefile": "^0.6.4",
     "@types/supertest": "^6.0.3",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
@@ -96,9 +87,7 @@
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.3",
-    "husky": "^9.1.7",
     "jest": "^30.0.5",
-    "lint-staged": "^16.1.2",
     "nodemon": "^3.1.7",
     "prettier": "^3.6.2",
     "supertest": "^7.1.4",
