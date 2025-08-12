@@ -1,4 +1,4 @@
-# US School Districts API
+# US School Districts Service
 
 High-performance API for US school district boundary lookups using NCES official data.
 
@@ -6,7 +6,16 @@ High-performance API for US school district boundary lookups using NCES official
 
 Provides school district information based on geographic coordinates for the CandyComp platform. Uses official NCES (National Center for Education Statistics) shapefile data with R-tree spatial indexing for fast lookups. Built with TypeScript and Express, featuring ultra-low memory usage (~40MB) and LRU caching.
 
-## Quick Start
+## Features
+
+- **R-tree Spatial Index** - O(log n) performance for boundary lookups
+- **Memory Optimization** - Custom simplified geometries (~40MB total)
+- **LRU Cache** - Frequently accessed districts cached in memory
+- **NCES Data** - Official government school district boundaries
+- **TypeScript** - Full type safety with zero errors/warnings
+- **High Performance** - Handles 1000+ RPS with <10ms lookups
+
+## Installation
 
 ```bash
 # Install dependencies
@@ -15,49 +24,47 @@ npm install
 # Download NCES shapefile data (first run)
 npm run download-data
 
+# Build TypeScript
+npm run build
+
 # Run development server
 npm run dev
 
 # Run production
-npm run build && npm start
+npm start
 ```
 
-## Configuration
-
-Environment variables (see `.env.example` for full documentation):
+## Environment Variables
 
 ### Core Settings
-| Variable      | Description                 | Default         |
-| ------------- | --------------------------- | --------------- |
-| `PORT`        | Service port                | `3712`          |
-| `NODE_ENV`    | Environment mode            | `development`   |
-| `LOG_LEVEL`   | Logging level (error/warn/info/debug) | `info` |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| PORT | Service port | 3712 |
+| NODE_ENV | Environment mode | development |
+| LOG_LEVEL | Logging level | info |
 
 ### Performance Tuning
-| Variable      | Description                 | Default         |
-| ------------- | --------------------------- | --------------- |
-| `GEOMETRY_SIMPLIFICATION_TOLERANCE` | Boundary accuracy (decimal degrees) | `0.001` |
-| `MAX_BATCH_SIZE` | Max coordinates per batch request | `50` |
-| `GEOMETRY_CACHE_SIZE` | Number of districts to cache | `10` |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| GEOMETRY_SIMPLIFICATION_TOLERANCE | Boundary accuracy (decimal degrees) | 0.001 |
+| MAX_BATCH_SIZE | Max coordinates per batch request | 50 |
+| GEOMETRY_CACHE_SIZE | Number of districts to cache | 10 |
 
 ### Security (Optional)
-| Variable      | Description                 | Default         |
-| ------------- | --------------------------- | --------------- |
-| `ENABLE_SECURITY_MIDDLEWARE` | Enable helmet/CORS/rate limiting | `false` |
-| `RATE_LIMIT_WINDOW_MS` | Rate limit time window | `60000` |
-| `RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `100` |
-| `CORS_ALLOWED_ORIGINS` | Allowed CORS origins | `*` |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| ENABLE_SECURITY_MIDDLEWARE | Enable helmet/CORS/rate limiting | false |
+| RATE_LIMIT_WINDOW_MS | Rate limit time window | 60000 |
+| RATE_LIMIT_MAX_REQUESTS | Max requests per window | 100 |
+| CORS_ALLOWED_ORIGINS | Allowed CORS origins | * |
 
-## API Reference
+## API Endpoints
 
-### Endpoints
-
-#### `POST /lookup`
+### `POST /lookup`
 
 Find school district by coordinates
 
-**Request Body:**
-
+**Request:**
 ```json
 {
   "lat": 42.3601,
@@ -66,7 +73,6 @@ Find school district by coordinates
 ```
 
 **Response:**
-
 ```json
 {
   "status": true,
@@ -75,12 +81,11 @@ Find school district by coordinates
 }
 ```
 
-#### `POST /batch-lookup`
+### `POST /batch-lookup`
 
 Lookup multiple coordinates
 
-**Request Body:**
-
+**Request:**
 ```json
 {
   "coordinates": [
@@ -91,7 +96,6 @@ Lookup multiple coordinates
 ```
 
 **Response:**
-
 ```json
 {
   "results": [
@@ -109,11 +113,11 @@ Lookup multiple coordinates
 }
 ```
 
-#### `GET /health`
+### `GET /health`
 
 Health check endpoint
 
-#### `GET /stats`
+### `GET /stats`
 
 Service statistics (cache hits, lookups, etc.)
 
@@ -141,12 +145,17 @@ npm run type-check
 
 # Linting
 npm run lint
+npm run lint:fix
 
 # Format code
 npm run format
+npm run format:check
 
 # Download latest NCES data
 npm run download-data
+
+# Clean build
+npm run clean
 ```
 
 ## Testing
@@ -164,15 +173,6 @@ npm run test:watch
 
 ## Architecture
 
-### Key Features
-
-- **R-tree Spatial Index**: O(log n) performance for boundary lookups
-- **Memory Optimization**: Custom simplified geometries (~40MB total)
-- **LRU Cache**: Frequently accessed districts cached in memory
-- **NCES Data**: Official government school district boundaries
-- **Graceful Shutdown**: Proper cleanup of resources
-- **Security**: IP whitelisting and rate limiting
-
 ### Data Processing
 
 1. Downloads NCES shapefile data
@@ -181,25 +181,85 @@ npm run test:watch
 4. Caches simplified boundaries
 5. Performs point-in-polygon tests
 
-### Performance
+### Performance Metrics
 
-- **Memory**: ~40MB (97% reduction from raw data)
-- **Lookup Speed**: <10ms average
-- **Startup Time**: ~2-3 seconds
-- **Concurrent Requests**: Handles 1000+ RPS
+- **Memory Usage** - ~40MB (97% reduction from raw data)
+- **Lookup Speed** - <10ms average
+- **Startup Time** - ~2-3 seconds
+- **Concurrent Requests** - Handles 1000+ RPS
 
-## Deployment
+## Production Deployment
 
-Runs as a local service on port 3712:
+### Using PM2
 
 ```bash
-# Start service
-npm start
+# Build for production
+npm run build
 
-# Using PM2
+# Start with PM2
 pm2 start ecosystem.config.js
-pm2 logs school-districts-api
+
+# Monitor
+pm2 monit
+
+# View logs
+pm2 logs service-us-school-districts
+
+# Restart
+pm2 restart service-us-school-districts
 ```
+
+### Manual Start
+
+```bash
+npm start
+```
+
+## GitHub Actions Deployment
+
+The repository includes a GitHub Actions workflow that automatically builds and deploys the service when you push to the `main` branch.
+
+### Required GitHub Secrets
+
+Configure these secrets in your GitHub repository settings:
+
+#### SSH Connection
+- `LINODE_HOST` - Server IP or hostname
+- `LINODE_USERNAME` - SSH username (e.g., `puppeteer-user`)
+- `LINODE_PASSWORD` - SSH password for authentication
+
+#### Application Environment
+- `PORT` - Service port (default: 3712)
+- `NODE_ENV` - Environment setting (e.g., `production`)
+- `LOG_LEVEL` - Logging level (e.g., `info`)
+- `GEOMETRY_SIMPLIFICATION_TOLERANCE` - Boundary accuracy
+- `MAX_BATCH_SIZE` - Max batch size
+- `GEOMETRY_CACHE_SIZE` - Cache size
+
+### Deployment Process
+
+1. Builds TypeScript project
+2. Copies built files to server
+3. Downloads NCES data if not present
+4. Creates `.env` file from GitHub secrets
+5. Installs production dependencies
+6. Restarts PM2 process
+
+## Performance Optimization
+
+- **Spatial Indexing** - R-tree index for O(log n) lookups
+- **Geometry Simplification** - Reduces memory by 97%
+- **LRU Caching** - Caches frequently accessed districts
+- **Connection Pooling** - Optimized HTTP connections
+- **Async Processing** - Non-blocking operations
+
+## Security
+
+- **Input Validation** - All coordinates validated
+- **Rate Limiting** - Optional request throttling
+- **Error Sanitization** - Safe error responses
+- **CORS Support** - Configurable origins
+- **Helmet.js** - Security headers when enabled
 
 ## License
 
