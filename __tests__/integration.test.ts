@@ -61,18 +61,18 @@ describe('School District API Integration Tests', () => {
       expect(response.body.districtName).toBeTruthy();
     });
 
-    test('should return nearest district for ocean coordinates', async () => {
+    test('should return false status for ocean coordinates', async () => {
       const response = await request(app)
         .get('/school-district')
         .query({ lat: 0, lng: 0 })
         .expect(200);
 
-      // With the new implementation, we always find the nearest district
-      expect(response.body.status).toBe(true);
-      expect(response.body.districtId).toBeTruthy();
-      expect(response.body.districtName).toBeTruthy();
-      expect(response.body.isApproximate).toBe(true);
-      expect(response.body.approximateDistance).toBeGreaterThan(1000); // Very far away
+      // Ocean coordinates (0,0) are too far from any US district
+      expect(response.body).toMatchObject({
+        status: false,
+        districtId: null,
+        districtName: null,
+      });
     });
 
     test('should return error for invalid coordinates', async () => {

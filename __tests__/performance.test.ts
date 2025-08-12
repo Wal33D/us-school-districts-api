@@ -157,10 +157,10 @@ describe('Performance and Stress Tests', () => {
       for (const coord of coordinates) {
         const response = await request(app).get('/school-district').query(coord).expect(200);
 
-        // With new implementation, we always find the nearest district
-        expect(response.body.status).toBe(true);
-        expect(response.body.isApproximate).toBe(true);
-        expect(response.body.approximateDistance).toBeGreaterThan(1000000); // Very far (>1000km)
+        // International coordinates should return false (too far from US)
+        expect(response.body.status).toBe(false);
+        expect(response.body.districtId).toBeNull();
+        expect(response.body.districtName).toBeNull();
       }
 
       const totalTime = Date.now() - startTime;
