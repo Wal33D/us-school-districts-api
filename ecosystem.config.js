@@ -2,13 +2,14 @@ module.exports = {
   apps: [
     {
       name: 'us-school-districts-api',
-      script: 'dist/server.js',
+      script: 'startup.sh',
+      cwd: '/home/puppeteer-user/candycomp-us-school-districts-api',
       exec_mode: 'fork',
       max_memory_restart: '150M',
       autorestart: true,
       watch: false,
-      max_restarts: 10,
-      min_uptime: '20s',
+      max_restarts: 50,
+      min_uptime: '10s',
       restart_delay: 4000,
       
       error_file: './logs/error.log',
@@ -33,13 +34,6 @@ module.exports = {
       
       cron_restart: '0 3 * * *',
       wait_ready: true,
-      post_update: ['npm install', 'npm run build'],
-      
-      // Auto-rebuild native modules on deployment to fix Node version mismatch
-      post_deploy: [
-        'npm rebuild better-sqlite3',
-        'npm run setup-db'
-      ].join(' && '),
     },
   ],
 };
