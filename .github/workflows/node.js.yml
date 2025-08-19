@@ -54,7 +54,7 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
-            mkdir -p /home/puppeteer-user/candycomp-us-school-districts-api
+            mkdir -p /root/us-school-districts-api
 
       - name: Copy Build Files to Linode Server
         uses: appleboy/scp-action@master
@@ -63,7 +63,7 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           password: ${{ secrets.SERVER_PASSWORD }}
           source: 'build-files/.'
-          target: '/home/puppeteer-user/candycomp-us-school-districts-api/'
+          target: '/root/us-school-districts-api/'
           strip_components: 1
 
       - name: List deployment directory contents
@@ -72,7 +72,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USERNAME }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          script: 'ls -la /home/puppeteer-user/candycomp-us-school-districts-api/'
+          script: 'ls -la /root/us-school-districts-api/'
 
       - name: Install Node Modules and Setup Database on Linode
         uses: appleboy/ssh-action@master
@@ -81,7 +81,7 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
-            cd /home/puppeteer-user/candycomp-us-school-districts-api
+            cd /root/us-school-districts-api
             npm ci
             # Rebuild better-sqlite3 for current Node version
             npm rebuild better-sqlite3 || npm install better-sqlite3
@@ -114,6 +114,6 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
-            cd /home/puppeteer-user/candycomp-us-school-districts-api
+            cd /root/us-school-districts-api
             pm2 startOrReload ecosystem.config.js
             pm2 save
