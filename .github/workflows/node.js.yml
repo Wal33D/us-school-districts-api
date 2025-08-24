@@ -89,34 +89,39 @@ jobs:
             # Ensure school_district_data directory exists
             mkdir -p school_district_data
 
-            # Download shapefile if not present
-            if [ ! -f "school_district_data/EDGE_SCHOOLDISTRICT_TL24_SY2324.shp" ]; then
-              echo "Downloading NCES shapefile..."
-              cd school_district_data
-              # Download the shapefile from NCES (2024 school year data)
-              wget -q --show-progress "https://www2.census.gov/geo/tiger/TIGER2024/SCSD/tl_2024_us_scsd.zip" -O scsd.zip
-              if [ $? -eq 0 ]; then
-                unzip -q scsd.zip
-                # Rename to expected filename pattern
-                mv tl_2024_*_scsd.shp EDGE_SCHOOLDISTRICT_TL24_SY2324.shp 2>/dev/null || true
-                mv tl_2024_*_scsd.dbf EDGE_SCHOOLDISTRICT_TL24_SY2324.dbf 2>/dev/null || true
-                mv tl_2024_*_scsd.shx EDGE_SCHOOLDISTRICT_TL24_SY2324.shx 2>/dev/null || true
-                rm -f scsd.zip
-                echo "Shapefile downloaded successfully"
+            # Check if shapefile exists and is complete
+            SHAPEFILE_OK=false
+            if [ -f "school_district_data/EDGE_SCHOOLDISTRICT_TL24_SY2324.shp" ]; then
+              SHP_SIZE=$(stat -c%s school_district_data/EDGE_SCHOOLDISTRICT_TL24_SY2324.shp 2>/dev/null || echo "0")
+              SHP_SIZE_MB=$((SHP_SIZE / 1024 / 1024))
+              if [ $SHP_SIZE_MB -ge 200 ]; then
+                echo "✅ Shapefile exists and appears complete (${SHP_SIZE_MB}MB)"
+                SHAPEFILE_OK=true
               else
-                echo "Failed to download shapefile, trying alternative source..."
-                # Try alternative: Previous year's data
-                wget -q --show-progress "https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_us_scsd_500k.zip" -O scsd_alt.zip
-                if [ $? -eq 0 ]; then
-                  unzip -q scsd_alt.zip
-                  mv cb_2023_us_scsd_500k.shp EDGE_SCHOOLDISTRICT_TL24_SY2324.shp 2>/dev/null || true
-                  mv cb_2023_us_scsd_500k.dbf EDGE_SCHOOLDISTRICT_TL24_SY2324.dbf 2>/dev/null || true
-                  mv cb_2023_us_scsd_500k.shx EDGE_SCHOOLDISTRICT_TL24_SY2324.shx 2>/dev/null || true
-                  rm -f scsd_alt.zip
-                  echo "Alternative shapefile downloaded successfully"
-                else
-                  echo "ERROR: Could not download shapefile from any source"
-                  exit 1
+                echo "⚠️ Shapefile exists but is incomplete (${SHP_SIZE_MB}MB, expected ~298MB)"
+                echo "Removing incomplete shapefile..."
+                rm -f school_district_data/EDGE_SCHOOLDISTRICT_TL24_SY2324.*
+              fi
+            fi
+
+            # Download shapefile if not present or incomplete
+            if [ "$SHAPEFILE_OK" = false ]; then
+              echo "Downloading NCES shapefile (complete dataset with 13,382 districts)..."
+              cd school_district_data
+              # Download the COMPLETE shapefile from NCES (not the simplified Census TIGER version!)
+              wget -q --show-progress "https://nces.ed.gov/programs/edge/data/EDGE_SCHOOLDISTRICT_TL24_SY2324.zip" -O EDGE_SCHOOLDISTRICT_TL24_SY2324.zip
+              if [ $? -eq 0 ]; then
+                unzip -q -o EDGE_SCHOOLDISTRICT_TL24_SY2324.zip
+                rm -f EDGE_SCHOOLDISTRICT_TL24_SY2324.zip
+                echo "✅ NCES shapefile downloaded successfully"
+                # Verify it's complete
+                SHP_SIZE=$(stat -c%s EDGE_SCHOOLDISTRICT_TL24_SY2324.shp 2>/dev/null || echo "0")
+                SHP_SIZE_MB=$((SHP_SIZE / 1024 / 1024))
+                echo "Shapefile size: ${SHP_SIZE_MB}MB (expected ~298MB)"
+              else
+                echo "ERROR: Could not download shapefile from NCES"
+                echo "Please manually download from: https://nces.ed.gov/programs/edge/Geographic/DistrictBoundaries"
+                exit 1
                 fi
               fi
               cd ..

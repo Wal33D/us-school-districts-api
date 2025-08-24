@@ -16,6 +16,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "setup-db": "node dist/setup-database.js",
+    "verify-db": "node verify-shapefile.js",
     "postinstall": "npm rebuild better-sqlite3",
     "test": "jest",
     "test:coverage": "jest --coverage",
