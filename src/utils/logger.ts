@@ -63,7 +63,10 @@ const logFormat = printf(({ level, message, timestamp, stack, ...metadata }) => 
 
 // Create the logger
 export const logger = winston.createLogger({
-  level: config.logging.level || 'info',
+  level:
+    process.env['LOG_LEVEL'] ||
+    config.logging.level ||
+    (process.env['NODE_ENV'] === 'production' ? 'error' : 'info'),
   format: combine(errors({ stack: true }), timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), logFormat),
   transports: [
     // Console transport
