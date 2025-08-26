@@ -122,7 +122,6 @@ jobs:
                 echo "ERROR: Could not download shapefile from NCES"
                 echo "Please manually download from: https://nces.ed.gov/programs/edge/Geographic/DistrictBoundaries"
                 exit 1
-                fi
               fi
               cd ..
             fi
