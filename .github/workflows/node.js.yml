@@ -47,7 +47,7 @@ jobs:
       - name: List downloaded artifact
         run: ls -la build-files
 
-      - name: Ensure target directory exists on Linode
+      - name: Ensure target directory exists on Server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -56,7 +56,7 @@ jobs:
           script: |
             mkdir -p /root/us-school-districts-api
 
-      - name: Copy Build Files to Linode Server
+      - name: Copy Build Files to Server
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -74,7 +74,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: 'ls -la /root/us-school-districts-api/'
 
-      - name: Install Node Modules and Setup Database on Linode
+      - name: Install Node Modules and Setup Database on Server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -147,7 +147,7 @@ jobs:
               exit 1
             fi
 
-      - name: Start or Reload and Save PM2 Process on Linode
+      - name: Start or Reload and Save PM2 Process on Server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
