@@ -4,11 +4,11 @@ module.exports = {
       name: 'us-school-districts-api',
       script: 'dist/server.js',
       exec_mode: 'fork',
-      max_memory_restart: '200M',  // Increased from 150M to match other services
+      max_memory_restart: '150M',
       autorestart: true,
       watch: false,
-      max_restarts: 10,  // Reduced from 50 to standard 10
-      min_uptime: '20s',  // Increased to standard 20s
+      max_restarts: 50,
+      min_uptime: '10s',
       restart_delay: 4000,
       exp_backoff_restart_delay: 30000,  // Added exponential backoff
       
