@@ -4,7 +4,7 @@ High-performance API for US school district boundary lookups using NCES official
 
 ## Overview
 
-Provides school district information based on geographic coordinates for the CandyComp platform. Uses official NCES (National Center for Education Statistics) shapefile data stored in SQLite with spatial indexing for ultra-fast lookups. Built with TypeScript and Express, featuring minimal memory usage (~100MB) and exceptional reliability.
+Provides school district information based on geographic coordinates for various platform. Uses official NCES (National Center for Education Statistics) shapefile data stored in SQLite with spatial indexing for ultra-fast lookups. Built with TypeScript and Express, featuring minimal memory usage (~100MB) and exceptional reliability.
 
 ## Performance Improvements (v2.0)
 
